@@ -1,6 +1,10 @@
 import { Router } from "express";
 import mongoose from "mongoose";
-import authRouter from "./auth.route.js"; // 🆕
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "../config/swagger.js";
+import authRouter from "./auth.route.js";
+import friendRouter from "./friend.route.js";
+import messageRouter from "./message.route.js";
 
 const router = Router();
 
@@ -11,7 +15,26 @@ const DB_STATES = {
   3: "disconnecting",
 };
 
-// Health check
+// ── Swagger UI ────────────────────────────────────────────────────
+router.use(
+  "/docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: "🚀 Chat API Docs",
+    customCss: ".swagger-ui .topbar { background-color: #1e40af }",
+    swaggerOptions: {
+      persistAuthorization: true, // Nhớ token khi refresh
+    },
+  }),
+);
+
+// Swagger JSON raw
+router.get("/docs.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
+
+// ── Health Check ──────────────────────────────────────────────────
 router.get("/health", (req, res) => {
   const dbState = mongoose.connection.readyState;
   res.status(200).json({
@@ -27,9 +50,9 @@ router.get("/health", (req, res) => {
   });
 });
 
-// 🆕 Mount auth routes
-// Tất cả routes trong authRouter sẽ có prefix /auth
-// Ví dụ: POST /api/v1/auth/signup
+// ── Mount Routes ──────────────────────────────────────────────────
 router.use("/auth", authRouter);
+router.use("/friends", friendRouter);
+router.use("/", messageRouter); // /conversations, /messages
 
 export default router;
