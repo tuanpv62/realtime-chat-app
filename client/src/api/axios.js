@@ -1,12 +1,12 @@
 import axios from "axios";
 
 // Axios instance
+
 const api = axios.create({
-  baseURL: "/api/v1",
+  // Dùng env var thay vì hardcode
+  baseURL: import.meta.env.VITE_API_URL || "/api/v1",
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
   timeout: 15000,
 });
 
