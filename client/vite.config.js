@@ -23,30 +23,32 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      // Output directory
       outDir: "dist",
-      // Source maps chỉ cho dev
       sourcemap: mode === "development",
-      // Chunk splitting để tối ưu loading
+
       rollupOptions: {
         output: {
-          manualChunks: {
-            // Tách vendor libraries thành chunk riêng
-            // → Browser cache lâu hơn vì không đổi thường xuyên
-            react: ["react", "react-dom", "react-router-dom"],
-            socket: ["socket.io-client"],
-            ui: [
-              "@radix-ui/react-dialog",
-              "@radix-ui/react-dropdown-menu",
-              "@radix-ui/react-avatar",
-              "@radix-ui/react-tooltip",
-            ],
-            emoji: ["@emoji-mart/react", "@emoji-mart/data"],
-            utils: ["date-fns", "zod", "zustand", "axios"],
+          // ✅ FIX: chuyển từ object → function
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("react")) return "react";
+              if (id.includes("socket.io-client")) return "socket";
+              if (id.includes("@radix-ui")) return "ui";
+              if (id.includes("@emoji-mart")) return "emoji";
+              if (
+                id.includes("date-fns") ||
+                id.includes("zod") ||
+                id.includes("zustand") ||
+                id.includes("axios")
+              ) {
+                return "utils";
+              }
+              return "vendor"; // fallback
+            }
           },
         },
       },
-      // Warn nếu chunk > 500KB
+
       chunkSizeWarningLimit: 500,
     },
     preview: {
