@@ -23,8 +23,10 @@ mongoose.connection.on("disconnected", () => {
 
 // ─── Connect Function ────────────────────────────────────────────
 const connectDB = async () => {
+  console.log("MONGO_URI:", process.env.MONGO_URI);
   try {
     await mongoose.connect(config.db.uri, {
+      
       // ── Connection Pool ──────────────────────────────────────
       // maxPoolSize: Số lượng connection tối đa trong pool
       // Mặc định là 5, tăng lên cho production traffic cao
