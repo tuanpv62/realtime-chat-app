@@ -29,8 +29,10 @@ export const useChatStore = create((set, get) => ({
   // unreadCounts: { [conversationId]: number }
 
   // ── Actions: Conversations ────────────────────────────────────
-  setConversations: (conversations) => set({ conversations }),
-
+  setConversations: (conversations) =>
+    set({
+      conversations: Array.isArray(conversations) ? conversations : [],
+    }),
   setActiveConversation: (conversation) => {
     set({ activeConversation: conversation });
     // Clear unread khi mở conversation
@@ -51,9 +53,11 @@ export const useChatStore = create((set, get) => ({
 
   updateConversation: (conversationId, updates) =>
     set((state) => ({
-      conversations: state.conversations.map((c) =>
-        c._id === conversationId ? { ...c, ...updates } : c,
-      ),
+      conversations: Array.isArray(state.conversations)
+        ? state.conversations.map((c) =>
+            c._id === conversationId ? { ...c, ...updates } : c,
+          )
+        : [],
       activeConversation:
         state.activeConversation?._id === conversationId
           ? { ...state.activeConversation, ...updates }
@@ -63,7 +67,10 @@ export const useChatStore = create((set, get) => ({
   // ── Actions: Messages ─────────────────────────────────────────
   setMessages: (conversationId, messages) =>
     set((state) => ({
-      messages: { ...state.messages, [conversationId]: messages },
+      messages: {
+        ...state.messages,
+        [conversationId?.toString()]: messages,
+      },
     })),
 
   appendMessages: (conversationId, olderMessages) =>
@@ -78,55 +85,75 @@ export const useChatStore = create((set, get) => ({
       },
     })),
 
-  addMessage: (conversationId, message) => {
+  // addMessage: (conversationId, message) => {
+  //   const convId = conversationId?.toString();
+
+  //   set((state) => {
+  //     const existing = state.messages[convId] || [];
+
+  //     const isDuplicate = existing.some((m) => m._id === message._id);
+  //     if (isDuplicate) return state;
+
+  //     const updatedConversations = state.conversations.map((c) =>
+  //       c._id?.toString() === convId
+  //         ? { ...c, lastMessage: message, updatedAt: message.createdAt }
+  //         : c,
+  //     );
+
+  //     updatedConversations.sort(
+  //       (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+  //     );
+
+  //     const isActive = state.activeConversation?._id?.toString() === convId;
+
+  //     const unreadCounts = isActive
+  //       ? state.unreadCounts
+  //       : {
+  //           ...state.unreadCounts,
+  //           [convId]: (state.unreadCounts[convId] || 0) + 1,
+  //         };
+
+  //     return {
+  //       messages: {
+  //         ...state.messages,
+  //         [convId]: [...existing, message],
+  //       },
+  //       conversations: updatedConversations,
+  //       unreadCounts,
+  //     };
+  //   });
+  // },
+
+  addMessage: (conversationId, message) =>
     set((state) => {
-      const existing = state.messages[conversationId] || [];
+      const convId = conversationId?.toString();
+      const prev = state.messages[convId] || [];
 
-      // Tránh duplicate (realtime + optimistic update)
-      const isDuplicate = existing.some((m) => m._id === message._id);
-      if (isDuplicate) return state;
-
-      // Update conversation lastMessage
-      const updatedConversations = state.conversations.map((c) =>
-        c._id === conversationId
-          ? { ...c, lastMessage: message, updatedAt: message.createdAt }
-          : c,
-      );
-
-      // Sort conversations: Conversation có tin nhắn mới nhất lên đầu
-      updatedConversations.sort(
-        (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
-      );
-
-      // Tăng unread nếu không phải active conversation
-      const isActive = state.activeConversation?._id === conversationId;
-      const unreadCounts = isActive
-        ? state.unreadCounts
-        : {
-            ...state.unreadCounts,
-            [conversationId]: (state.unreadCounts[conversationId] || 0) + 1,
-          };
+      // 🔥 FIX DUPLICATE
+      if (prev.some((m) => (m.id || m._id) === (message.id || message._id))) {
+        return state;
+      }
 
       return {
         messages: {
           ...state.messages,
-          [conversationId]: [...existing, message],
+          [convId]: [...prev, message],
         },
-        conversations: updatedConversations,
-        unreadCounts,
       };
-    });
-  },
+    }),
+  updateMessage: (conversationId, messageId, updated) =>
+    set((state) => {
+      const convId = conversationId?.toString();
 
-  updateMessage: (conversationId, messageId, updates) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [conversationId]: (state.messages[conversationId] || []).map((m) =>
-          m._id === messageId ? { ...m, ...updates } : m,
-        ),
-      },
-    })),
+      return {
+        messages: {
+          ...state.messages,
+          [convId]: (state.messages[convId] || []).map((msg) =>
+            msg.id === messageId ? { ...msg, ...updated } : msg,
+          ),
+        },
+      };
+    }),
 
   // ── Actions: Online Status ────────────────────────────────────
   setOnlineUsers: (userIds) => set({ onlineUsers: new Set(userIds) }),
@@ -163,7 +190,8 @@ export const useChatStore = create((set, get) => ({
 
   // ── Selectors (computed helpers) ──────────────────────────────
   // Gọi: useChatStore.getState().getMessages(convId)
-  getMessages: (conversationId) => get().messages[conversationId] || [],
+  getMessages: (conversationId) =>
+    get().messages[conversationId?.toString()] || [],
 
   isUserOnline: (userId) => get().onlineUsers.has(userId),
 

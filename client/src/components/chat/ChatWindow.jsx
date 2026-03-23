@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import {
-  Phone, Video, Info, ChevronDown,
-  ArrowDown,
+  Phone, Video, Info, ArrowDown,
 } from 'lucide-react';
+
 // eslint-disable-next-line no-unused-vars
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/button';
@@ -18,50 +18,43 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { useChatStore } from '@/stores/chatStore';
 import { chatAPI } from '@/api/chat.api';
+import { useConversationSocket } from '@/hooks/useConversationSocket';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
-// Nhóm messages liên tiếp của cùng sender → Tránh hiện avatar nhiều lần
 function groupMessages(messages) {
   return messages.map((msg, index) => {
     const prev = messages[index - 1];
     const next = messages[index + 1];
-
-    const sameSenderAsPrev =
+    const samePrev =
       prev &&
       (prev.sender?.id || prev.sender?._id) ===
         (msg.sender?.id || msg.sender?._id);
-
-    const sameSenderAsNext =
+    const sameNext =
       next &&
       (next.sender?.id || next.sender?._id) ===
         (msg.sender?.id || msg.sender?._id);
-
     return {
       ...msg,
-      showAvatar: !sameSenderAsNext,
-      showSenderName: !sameSenderAsPrev,
-      isGrouped: sameSenderAsPrev || sameSenderAsNext,
+      showAvatar: !sameNext,
+      showSenderName: !samePrev,
     };
   });
 }
 
-// Edit input inline
 function EditInput({ message, onSave, onCancel }) {
   const [content, setContent] = useState(message.content);
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      onSave(content);
-    }
-    if (e.key === 'Escape') onCancel();
-  };
-
   return (
-    <div className="flex items-center gap-2 mt-1">
+    <div className="flex items-center gap-2 mt-1 px-4">
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            onSave(content);
+          }
+          if (e.key === 'Escape') onCancel();
+        }}
         autoFocus
         rows={1}
         className="flex-1 resize-none rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -76,13 +69,10 @@ export function ChatWindow() {
   const { user: currentUser } = useAuthStore();
   const {
     activeConversation,
-    getMessages,
+  
     setMessages,
     appendMessages,
-    addMessage,
-    updateMessage,
     isUserOnline,
-    getTypingUsers,
     hasMoreMessages,
   } = useChatStore();
 
@@ -94,14 +84,33 @@ export function ChatWindow() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const virtuosoRef = useRef(null);
 
-  const conversationId = activeConversation?.id || activeConversation?._id;
-  const messages = getMessages(conversationId);
-  const groupedMessages = groupMessages(messages);
+// const conversationId =
+  //   (activeConversation?.id || activeConversation?._id)?.toString();
+    const conversationId = (
+  activeConversation?._id ||
+  activeConversation?.id
+  )?.toString();
 
-  // Load messages khi đổi conversation
+const messages = useChatStore(
+  (state) => state.messages[conversationId]
+  );
+
+  
+
+console.log("CHAT WINDOW ID:", conversationId);
+
+  
+  const safeMessages = messages || [];
+ const groupedMessages = groupMessages(safeMessages);
+
+  // 🆕 Socket hooks
+  const { handleTyping, typingUsers } = useConversationSocket(conversationId);
+  const { sendMessage, editMessage, deleteMessage, reactToMessage } =
+    useRealtimeMessages(conversationId);
+
+  // Load messages
   useEffect(() => {
     if (!conversationId) return;
-
     setIsLoading(true);
     setPage(1);
 
@@ -109,24 +118,34 @@ export function ChatWindow() {
       .getMessages(conversationId, { page: 1, limit: 30 })
       .then(({ messages: msgs, pagination }) => {
         setMessages(conversationId, msgs);
-        // Nếu còn trang → ghi nhận hasMore
-        if (pagination.hasMore) {
-          useChatStore.setState((s) => ({
-            hasMoreMessages: { ...s.hasMoreMessages, [conversationId]: true },
-          }));
-        }
+        useChatStore.setState((s) => ({
+          hasMoreMessages: {
+            ...s.hasMoreMessages,
+            [conversationId]: pagination.hasMore,
+          },
+        }));
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
   }, [conversationId]);
 
-  // Load more (infinite scroll lên trên)
+  // Scroll to bottom khi có message mới
+  useEffect(() => {
+    if (safeMessages.length > 0) {
+      setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({
+          index: safeMessages.length - 1,
+          behavior: 'smooth',
+        });
+      }, 100);
+    }
+  }, [safeMessages.length]);
+
+  // Load more (infinite scroll)
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMoreMessages[conversationId]) return;
-
     setIsLoadingMore(true);
     const nextPage = page + 1;
-
     try {
       const { messages: older, pagination } = await chatAPI.getMessages(
         conversationId,
@@ -134,12 +153,12 @@ export function ChatWindow() {
       );
       appendMessages(conversationId, older);
       setPage(nextPage);
-
-      if (!pagination.hasMore) {
-        useChatStore.setState((s) => ({
-          hasMoreMessages: { ...s.hasMoreMessages, [conversationId]: false },
-        }));
-      }
+      useChatStore.setState((s) => ({
+        hasMoreMessages: {
+          ...s.hasMoreMessages,
+          [conversationId]: pagination.hasMore,
+        },
+      }));
     } catch (err) {
       console.error(err);
     } finally {
@@ -147,45 +166,26 @@ export function ChatWindow() {
     }
   }, [conversationId, isLoadingMore, page, hasMoreMessages]);
 
-  const handleSend = async ({ content, type, replyTo: replyId }) => {
-    const message = await chatAPI.sendMessage(conversationId, {
+  // Handle send (via socket)
+  const handleSend = async ({ content, type = 'text', replyTo: replyId }) => {
+    await sendMessage({
       content,
       type,
       replyTo: replyId,
     });
-    addMessage(conversationId, message);
-
-    // Scroll xuống dưới cùng
-    setTimeout(() => {
-      virtuosoRef.current?.scrollToIndex({
-        index: messages.length,
-        behavior: 'smooth',
-      });
-    }, 50);
+    setReplyTo(null);
   };
 
+  // Handle edit
   const handleEditSave = async (newContent) => {
-    if (!editingMessage) return;
+    if (!editingMessage || !newContent.trim()) return;
     try {
-      const updated = await chatAPI.editMessage(
-        editingMessage.id || editingMessage._id,
-        newContent
-      );
-      updateMessage(conversationId, editingMessage.id || editingMessage._id, {
-        content: updated.content,
-        isEdited: true,
-      });
+      await editMessage(editingMessage.id || editingMessage._id, newContent);
     } catch (err) {
       console.error(err);
     }
     setEditingMessage(null);
   };
-
-  // Typing users
-  const typingUsers = getTypingUsers(conversationId);
-  const typingArray = [...typingUsers].filter(
-    (id) => id !== currentUser?.id
-  );
 
   // Display info
   const isGroup = activeConversation?.type === 'group';
@@ -197,9 +197,13 @@ export function ChatWindow() {
   const displayName = isGroup
     ? activeConversation?.name
     : otherUser?.displayName || otherUser?.username;
-  const isOnline = otherUser ? isUserOnline(otherUser.id || otherUser._id) : false;
+  const isOnline = otherUser
+    ? isUserOnline(otherUser.id || otherUser._id)
+    : false;
 
-  // Empty state
+  // Typing indicator display
+  const typingArray = [...typingUsers].filter((id) => id !== currentUser?.id);
+
   if (!activeConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background">
@@ -218,7 +222,7 @@ export function ChatWindow() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
-      {/* ── Header ─────────────────────────────────────────────── */}
+      {/* Header */}
       {isLoading ? (
         <ChatHeaderSkeleton />
       ) : (
@@ -227,10 +231,7 @@ export function ChatWindow() {
             <UserAvatar
               user={
                 isGroup
-                  ? {
-                      displayName: activeConversation.name,
-                      avatar: activeConversation.groupAvatar,
-                    }
+                  ? { displayName: activeConversation.name, avatar: activeConversation.groupAvatar }
                   : otherUser
               }
               size="md"
@@ -251,8 +252,6 @@ export function ChatWindow() {
               )}
             </div>
           </div>
-
-          {/* Header actions */}
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <Phone className="h-4 w-4" />
@@ -267,18 +266,20 @@ export function ChatWindow() {
         </div>
       )}
 
-      {/* ── Messages ───────────────────────────────────────────── */}
+      {/* Messages */}
       <div className="flex-1 relative overflow-hidden">
         {isLoading ? (
           <MessageListSkeleton />
         ) : (
+            
           <Virtuoso
             ref={virtuosoRef}
             data={groupedMessages}
             followOutput="smooth"
-            initialTopMostItemIndex={groupedMessages.length - 1}
+            initialTopMostItemIndex={Math.max(0, groupedMessages.length - 1)}
             startReached={hasMoreMessages[conversationId] ? loadMore : undefined}
             atBottomStateChange={(atBottom) => setShowScrollBtn(!atBottom)}
+            style={{ height: '100%' }}
             components={{
               Header: () =>
                 isLoadingMore ? (
@@ -287,17 +288,17 @@ export function ChatWindow() {
                   </div>
                 ) : null,
             }}
-            itemContent={(index, message) => (
-              <div key={message.id || message._id}>
-                {editingMessage?.id === message.id ||
-                editingMessage?._id === message._id ? (
-                  <div className="px-4 py-1">
-                    <EditInput
-                      message={message}
-                      onSave={handleEditSave}
-                      onCancel={() => setEditingMessage(null)}
-                    />
-                  </div>
+              itemContent={(_, message) => (
+              
+              <div key={message.id || message._id} className="py-0.5">
+                {(editingMessage && editingMessage._id === message._id) ? (
+                  <EditInput
+                    message={message}
+                    onSave={handleEditSave}
+                    onCancel={() => setEditingMessage(null)}
+                    
+                  />
+                  
                 ) : (
                   <MessageCard
                     message={message}
@@ -305,6 +306,8 @@ export function ChatWindow() {
                     showSenderName={isGroup && message.showSenderName}
                     onReply={setReplyTo}
                     onEdit={setEditingMessage}
+                    onReact={reactToMessage}
+                    onDelete={deleteMessage}
                   />
                 )}
               </div>
@@ -312,7 +315,7 @@ export function ChatWindow() {
           />
         )}
 
-        {/* Scroll to bottom button */}
+        {/* Scroll to bottom */}
         {showScrollBtn && (
           <Button
             size="icon"
@@ -329,10 +332,10 @@ export function ChatWindow() {
         )}
       </div>
 
-      {/* ── Typing Indicator ─────────────────────────────────── */}
+      {/* Typing Indicator */}
       {typingArray.length > 0 && (
-        <div className="px-4 py-1 text-xs text-muted-foreground animate-fade-in">
-          <span className="inline-flex items-center gap-1">
+        <div className="px-4 py-1 shrink-0">
+          <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <span className="flex gap-0.5">
               {[0, 1, 2].map((i) => (
                 <span
@@ -347,9 +350,10 @@ export function ChatWindow() {
         </div>
       )}
 
-      {/* ── Input ─────────────────────────────────────────────── */}
+      {/* Input */}
       <MessageInput
         onSend={handleSend}
+        onTyping={handleTyping}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         disabled={isLoading}

@@ -1,9 +1,9 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react';
 import {
   MessageSquare, Users, UserPlus, Settings,
   Search, Plus, LogOut, Bell,
 } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,16 @@ import { useChatStore } from '@/stores/chatStore';
 import { chatAPI } from '@/api/chat.api';
 import { AddFriendModal } from './AddFriendModal';
 import { CreateGroupModal } from './CreateGroupModal';
+
+import { useNavigate } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 const TABS = [
   { id: 'chats', icon: MessageSquare, label: 'Tin nhắn' },
@@ -41,14 +51,31 @@ export function Sidebar() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
-
+// Trong component Sidebar:
+    const navigate = useNavigate();
+    
   // Load conversations
   useEffect(() => {
     const loadConversations = async () => {
       setIsLoading(true);
       try {
         const data = await chatAPI.getConversations();
-        setConversations(data);
+        // setConversations(data);
+        setConversations((prev) => {
+          // Giữ lại các conversation đã có trong store (nếu có) để tránh mất trạng thái như unread count
+          const existingIds = new Set(prev.map((c) => c._id));
+          const merged = [...prev];
+          data.forEach((conv) => {
+            if (!existingIds.has(conv._id)) {
+              merged.push(conv);
+            } else {
+              // Cập nhật thông tin conversation nếu đã tồn tại (như name, participants)
+              const index = merged.findIndex((c) => c._id === conv._id);
+              merged[index] = { ...merged[index], ...conv };
+            }
+          });
+          return merged;
+        });
       } catch (err) {
         console.error('Failed to load conversations:', err);
       } finally {
@@ -58,21 +85,22 @@ export function Sidebar() {
     loadConversations();
   }, []);
 
-  // Filter conversations theo search
-  const filteredConversations = conversations.filter((conv) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
+const safeConversations = Array.isArray(conversations) ? conversations : [];
 
-    if (conv.type === 'group') {
-      return conv.name?.toLowerCase().includes(q);
-    }
+const filteredConversations = safeConversations.filter((conv) => {
+  if (!searchQuery.trim()) return true;
+  const q = searchQuery.toLowerCase();
 
-    return conv.participants?.some(
-      (p) =>
-        p.username?.toLowerCase().includes(q) ||
-        p.displayName?.toLowerCase().includes(q)
-    );
-  });
+  if (conv.type === 'group') {
+    return conv.name?.toLowerCase().includes(q);
+  }
+
+  return conv.participants?.some(
+    (p) =>
+      p.username?.toLowerCase().includes(q) ||
+      p.displayName?.toLowerCase().includes(q)
+  );
+});
 
   const totalUnread = getTotalUnread();
 
@@ -90,8 +118,7 @@ export function Sidebar() {
 
           <Separator className="w-8 my-1" />
 
-                  {/* Tab buttons */}
-                  {/* eslint-disable-next-line no-unused-vars */}
+          {/* Tab buttons */}
           {TABS.map(({ id, icon: Icon, label }) => (
             <Tooltip key={id}>
               <TooltipTrigger asChild>
@@ -136,20 +163,35 @@ export function Sidebar() {
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* User Avatar + Signout */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={signout}
-                className="p-1 rounded-full hover:ring-2 hover:ring-primary transition-all"
-              >
-                <UserAvatar user={user} size="sm" showStatus />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              {user?.displayName} · Đăng xuất
-            </TooltipContent>
-          </Tooltip>
+        {/* // Thay button signout bằng dropdown */}
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <button className="p-1 rounded-full hover:ring-2 hover:ring-primary transition-all">
+      <UserAvatar user={user} size="sm" showStatus />
+    </button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent side="right" align="end" className="w-48">
+    <DropdownMenuLabel className="font-normal">
+      <div className="flex flex-col space-y-1">
+        <p className="text-sm font-medium">{user?.displayName}</p>
+        <p className="text-xs text-muted-foreground">@{user?.username}</p>
+      </div>
+    </DropdownMenuLabel>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem onClick={() => navigate('/profile')}>
+      <Settings className="h-4 w-4 mr-2" />
+      Trang cá nhân
+    </DropdownMenuItem>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem
+      className="text-destructive focus:text-destructive"
+      onClick={signout}
+    >
+      <LogOut className="h-4 w-4 mr-2" />
+      Đăng xuất
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
         </div>
 
         {/* ── Main Panel ───────────────────────────────────────── */}
@@ -208,7 +250,10 @@ export function Sidebar() {
                         (c) => c.type === 'direct'
                       )}
                       activeConversation={activeConversation}
-                      onSelect={setActiveConversation}
+                       onSelect={(conv) => {
+    console.log("SET ACTIVE:", conv._id);
+    setActiveConversation(conv);
+  }}
                     />
 
                     {/* Group Chats */}
@@ -217,18 +262,35 @@ export function Sidebar() {
                         (c) => c.type === 'group'
                       )}
                       activeConversation={activeConversation}
-                      onSelect={setActiveConversation}
+                       onSelect={(conv) => {
+    console.log("SET ACTIVE:", conv._id);
+    setActiveConversation(conv);
+  }}
                     />
                   </div>
                 )}
               </>
             )}
 
-                      {activeTab === 'friends' && (
-                          // eslint-disable-next-line no-unused-vars
-              <FriendsList onStartChat={(userId) => {
-                // Sẽ mở conversation ở phần sau
-              }} />
+            {activeTab === 'friends' && (
+         <FriendsList
+  onStartChat={async (userId) => {
+    try {
+      const conv = await chatAPI.getOrCreateDirect(userId);
+
+      // thêm vào list nếu chưa có
+      setConversations((prev) => {
+        const exists = prev.some((c) => c._id === conv._id);
+        return exists ? prev : [conv, ...prev];
+      });
+
+      // set active để mở chat
+      setActiveConversation(conv);
+    } catch (err) {
+      console.error("Create conversation failed:", err);
+    }
+  }}
+/>
             )}
           </ScrollArea>
         </div>
@@ -266,9 +328,11 @@ function DirectMessageList({ conversations, activeConversation, onSelect }) {
           conversation={conv}
           isActive={
             (activeConversation?.id || activeConversation?._id) ===
-            (conv.id || conv._id)
+       conv._id?.toString()
           }
-          onClick={() => onSelect(conv)}
+          onClick={() => {
+  useChatStore.getState().setActiveConversation(conv);
+}}
         />
       ))}
     </div>
@@ -288,7 +352,7 @@ function GroupChatList({ conversations, activeConversation, onSelect }) {
           conversation={conv}
           isActive={
             (activeConversation?.id || activeConversation?._id) ===
-            (conv.id || conv._id)
+           conv._id?.toString()
           }
           onClick={() => onSelect(conv)}
         />

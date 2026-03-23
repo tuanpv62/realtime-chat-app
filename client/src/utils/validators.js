@@ -12,7 +12,7 @@ export const signupSchema = z
 
     password: z
       .string()
-      .min(6, "Password phải có ít nhất 6 ký tự")
+      .min(1, "Password phải có ít nhất 1 ký tự")
       .max(100, "Password không được quá 100 ký tự"),
 
     confirmPassword: z.string().min(1, "Vui lòng xác nhận password"),

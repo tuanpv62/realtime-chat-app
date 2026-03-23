@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuthStore } from '@/stores/authStore';
+// eslint-disable-next-line no-unused-vars
 import { chatAPI } from '@/api/chat.api';
 import { useChatStore } from '@/stores/chatStore';
 
@@ -65,9 +66,12 @@ export function MessageCard({
   showAvatar = true,
   showSenderName = false,
   onReply,
-  onEdit,
+    onEdit,
+    onReact,    // 🆕
+  onDelete,   // 🆕
 }) {
   const { user: currentUser } = useAuthStore();
+  // eslint-disable-next-line no-unused-vars
   const { updateMessage, activeConversation } = useChatStore();
   const [showActions, setShowActions] = useState(false);
   const [isReacting, setIsReacting] = useState(false);
@@ -90,14 +94,10 @@ export function MessageCard({
     );
   }
 
-  const handleReact = async (emoji) => {
+ const handleReact = async (emoji) => {
     try {
-      const updated = await chatAPI.reactToMessage(message.id || message._id, emoji);
-      updateMessage(
-        activeConversation?.id || activeConversation?._id,
-        message.id || message._id,
-        { reactions: updated.reactions }
-      );
+      // Dùng prop onReact (socket) thay vì chatAPI trực tiếp
+      await onReact?.(message.id || message._id, emoji);
     } catch (err) {
       console.error('React failed:', err);
     }
@@ -105,14 +105,8 @@ export function MessageCard({
   };
 
   const handleDelete = async () => {
-      try {
-        // eslint-disable-next-line no-unused-vars
-      const updated = await chatAPI.deleteMessage(message.id || message._id);
-      updateMessage(
-        activeConversation?.id || activeConversation?._id,
-        message.id || message._id,
-        { isDeleted: true, content: '' }
-      );
+    try {
+      await onDelete?.(message.id || message._id);
     } catch (err) {
       console.error('Delete failed:', err);
     }
