@@ -8,8 +8,13 @@ import { initSocket } from "./socket/socket.js"; // 🆕
 const PORT = config.server.port;
 
 const startServer = async () => {
+  console.log("🚀 SERVER STARTING...");
   await connectDB();
-
+  console.log("🚀 DATABASE CONNECTED...");
+  console.log("ENV CHECK:", {
+    PORT: process.env.PORT,
+    MONGO: process.env.MONGODB_URI ? "OK" : "MISSING",
+  });
   // 🆕 Tạo HTTP server từ Express app
   // Socket.IO cần raw HTTP server, không phải Express app
   const httpServer = createServer(app);
