@@ -30,8 +30,9 @@ const startServer = async () => {
 const allowedOrigins = [
   "http://localhost:5173",
   "https://realtime-chat-app-hazel-six.vercel.app",
-  "https://realtime-chat-gh30s2unf-tuanpv62s-projects.vercel.app", // 🔥 thêm cái này
   "https://realtime-chat-app-tuanpv62s-projects.vercel.app",
+  "https://realtime-chat-app-git-main-tuanpv62s-projects.vercel.app",
+  "https://realtime-chat-haumhk0tw-tuanpv62s-projects.vercel.app"
 ];
 
 // app.use(
