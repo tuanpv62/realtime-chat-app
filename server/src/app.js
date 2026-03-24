@@ -20,18 +20,36 @@ app.use(
 
 // ── CORS Production Config ────────────────────────────────────────
 const corsOptions = {
+  // origin: (origin, callback) => {
+  //   // Cho phép requests không có origin (mobile apps, Postman, server-to-server)
+  //   if (!origin) return callback(null, true);
+
+  //   const allowedOrigins = config.cors.clientUrls;
+
+  //   // Exact match
+  //   if (allowedOrigins.includes(origin)) {
+  //     return callback(null, true);
+  //   }
+
+  //   // Vercel preview URLs: https://app-xxx.vercel.app
+  //   const isVercelPreview = /^https:\/\/.*\.vercel\.app$/.test(origin);
+  //   if (isVercelPreview) {
+  //     return callback(null, true);
+  //   }
+
+  //   callback(new Error(`CORS: Origin ${origin} not allowed`));
+  // },
   origin: (origin, callback) => {
-    // Cho phép requests không có origin (mobile apps, Postman, server-to-server)
+    console.log("🌍 CORS Origin:", origin); // 👈 thêm dòng này
+
     if (!origin) return callback(null, true);
 
     const allowedOrigins = config.cors.clientUrls;
 
-    // Exact match
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // Vercel preview URLs: https://app-xxx.vercel.app
     const isVercelPreview = /^https:\/\/.*\.vercel\.app$/.test(origin);
     if (isVercelPreview) {
       return callback(null, true);
