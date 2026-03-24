@@ -6,7 +6,9 @@ import connectDB from "./config/db.js";
 import { initSocket } from "./socket/socket.js"; // 🆕
 import cors from "cors";
 
-const PORT = config.server.port;
+// const PORT = config.server.port;
+
+const PORT = process.env.PORT || config.server.port;
 
 const startServer = async () => {
   console.log("🚀 SERVER STARTING...");
@@ -34,7 +36,7 @@ app.use(
     credentials: true,
   }),
 );
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log("─────────────────────────────────────");
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${config.server.nodeEnv}`);

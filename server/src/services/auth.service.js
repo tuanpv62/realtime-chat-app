@@ -6,17 +6,22 @@ import config from "../config/app.config.js";
 // ─── Cookie Options ───────────────────────────────────────────────
 export const getRefreshTokenCookieOptions = () => ({
   httpOnly: true,
-  secure: config.server.nodeEnv === "production",
-  sameSite: config.server.nodeEnv === "production" ? "none" : "lax",
+
+  // Production: BẮT BUỘC secure: true khi dùng SameSite: 'none'
+  secure: process.env.NODE_ENV === "production",
+
+  // Cross-site cookie: frontend (vercel.app) ↔ backend (onrender.com)
+  // SameSite: 'none' + secure: true → Cho phép cross-site
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+
   maxAge: 7 * 24 * 60 * 60 * 1000,
   path: "/",
 });
 
-// Cookie options khi CLEAR (expire ngay lập tức)
 export const getClearCookieOptions = () => ({
   httpOnly: true,
-  secure: config.server.nodeEnv === "production",
-  sameSite: config.server.nodeEnv === "production" ? "none" : "lax",
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   path: "/",
 });
 
