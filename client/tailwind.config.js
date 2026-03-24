@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   // darkMode: 'class' → Toggle dark mode bằng class 'dark' trên <html>
-  darkMode: ["class"],
+  darkMode: "class",
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     container: {
