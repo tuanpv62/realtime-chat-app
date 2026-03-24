@@ -4,6 +4,7 @@ import app from "./app.js";
 import config from "./config/app.config.js";
 import connectDB from "./config/db.js";
 import { initSocket } from "./socket/socket.js"; // 🆕
+import cors from "cors";
 
 const PORT = config.server.port;
 
@@ -24,7 +25,15 @@ const startServer = async () => {
 
   // Attach io vào app để dùng trong controllers nếu cần
   app.set("io", io);
-
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://realtime-chat-app-hazel-six.vercel.app",
+    ],
+    credentials: true,
+  }),
+);
   httpServer.listen(PORT, () => {
     console.log("─────────────────────────────────────");
     console.log(`🚀 Server running on port ${PORT}`);
