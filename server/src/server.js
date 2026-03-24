@@ -27,12 +27,22 @@ const startServer = async () => {
 
   // Attach io vào app để dùng trong controllers nếu cần
   app.set("io", io);
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://realtime-chat-app-hazel-six.vercel.app",
+  "https://realtime-chat-gh30s2unf-tuanpv62s-projects.vercel.app", // 🔥 thêm cái này
+  "https://realtime-chat-app-tuanpv62s-projects.vercel.app",
+];
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://realtime-chat-app-hazel-six.vercel.app",
-    ],
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   }),
 );
