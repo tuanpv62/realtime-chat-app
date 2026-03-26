@@ -59,7 +59,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  // allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["*"],// Cho phép tất cả headers, bao gồm Authorization
   // Preflight cache: 24 giờ
   maxAge: 86400,
 };
