@@ -25,12 +25,23 @@ const config = {
   },
 };
 
-// Validate required env vars (cả dev lẫn production)
-const required = ["MONGODB_URI", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
+const isProduction = process.env.NODE_ENV === "production";
 
-const missing = required.filter((key) => !process.env[key]);
-if (missing.length > 0) {
-  throw new Error(`❌ Missing required env vars: ${missing.join(", ")}`);
+if (isProduction) {
+  const required = ["MONGODB_URI", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
+
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`❌ Missing required env vars: ${missing.join(", ")}`);
+  }
 }
+
+// Validate required env vars (cả dev lẫn production)
+// const required = ["MONGODB_URI", "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
+
+// const missing = required.filter((key) => !process.env[key]);
+// if (missing.length > 0) {
+//   throw new Error(`❌ Missing required env vars: ${missing.join(", ")}`);
+// }
 
 export default config;
