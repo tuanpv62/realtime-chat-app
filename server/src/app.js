@@ -18,72 +18,40 @@ app.use(
   }),
 );
 
-// ── CORS Production Config ────────────────────────────────────────
-const corsOptions = {
-  // origin: (origin, callback) => {
-  //   // Cho phép requests không có origin (mobile apps, Postman, server-to-server)
-  //   if (!origin) return callback(null, true);
+// ── CORS (FIX TRIỆT ĐỂ) ──────────────────────────────────────────
+// ⚠️ KHÔNG dùng allowedHeaders: ["*"] nữa
+// ⚠️ KHÔNG custom origin phức tạp nữa
 
-  //   const allowedOrigins = config.cors.clientUrls;
+app.use(
+  cors({
+    origin: true, // cho phép tất cả origin (Vercel auto OK)
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  }),
+);
 
-  //   // Exact match
-  //   if (allowedOrigins.includes(origin)) {
-  //     return callback(null, true);
-  //   }
-
-  //   // Vercel preview URLs: https://app-xxx.vercel.app
-  //   const isVercelPreview = /^https:\/\/.*\.vercel\.app$/.test(origin);
-  //   if (isVercelPreview) {
-  //     return callback(null, true);
-  //   }
-
-  //   callback(new Error(`CORS: Origin ${origin} not allowed`));
-  // },
-  origin: (origin, callback) => {
-    console.log("🌍 CORS Origin:", origin); // 👈 thêm dòng này
-
-    if (!origin) return callback(null, true);
-
-    const allowedOrigins = config.cors.clientUrls;
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    const isVercelPreview = /^https:\/\/.*\.vercel\.app$/.test(origin);
-    if (isVercelPreview) {
-      return callback(null, true);
-    }
-
-    callback(new Error(`CORS: Origin ${origin} not allowed`));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  // allowedHeaders: ["Content-Type", "Authorization"],
-  allowedHeaders: ["*"],// Cho phép tất cả headers, bao gồm Authorization
-  // Preflight cache: 24 giờ
-  maxAge: 86400,
-};
-
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // Pre-flight cho tất cả routes
+// 🔥 QUAN TRỌNG: xử lý preflight
+app.options("*", cors());
 
 // ── Middleware ────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
-// Log chỉ khi development
+// Log
 if (config.server.nodeEnv === "development") {
   app.use(morgan("dev"));
 } else {
-  // Production: Log tối giản, không log sensitive data
   app.use(morgan("tiny"));
 }
 
-// ── Trust proxy (Render, Railway dùng reverse proxy) ──────────────
-// Cần thiết để req.ip trả đúng IP thật, không phải IP của proxy
+// ── Trust proxy ───────────────────────────────────────────────────
 app.set("trust proxy", 1);
+
+// ── Test route (khuyên nên giữ) ───────────────────────────────────
+app.get("/", (req, res) => {
+  res.json({ message: "🚀 API is running..." });
+});
 
 // ── Routes ────────────────────────────────────────────────────────
 app.use("/api/v1", rootRouter);
