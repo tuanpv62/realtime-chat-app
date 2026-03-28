@@ -53,10 +53,11 @@ export const signup = asyncHandler(async (req, res) => {
 
 // ─── Signin (giữ nguyên) ──────────────────────────────────────────
 export const signin = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body;
 
+  // ── Validate ────────────────────────────────────────────────
   const missingFields = [];
-  if (!email) missingFields.push("email");
+  if (!identifier) missingFields.push("identifier");
   if (!password) missingFields.push("password");
 
   if (missingFields.length > 0) {
@@ -65,21 +66,24 @@ export const signin = asyncHandler(async (req, res) => {
       message: "Missing required fields",
       errors: missingFields.map((field) => ({
         field,
-        message: `${field} is required`,
+        message:
+          field === "identifier"
+            ? "Email hoặc username là bắt buộc"
+            : "Password là bắt buộc",
       })),
     });
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
+  if (identifier.trim().length < 3) {
     return res.status(400).json({
       success: false,
-      message: "Please provide a valid email address",
+      message: "Email hoặc username không hợp lệ",
     });
   }
 
+  // ── Call service ─────────────────────────────────────────────
   const { user, accessToken, refreshToken } = await signinService({
-    email: email.trim(),
+    identifier: identifier.trim(),
     password,
   });
 

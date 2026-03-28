@@ -1,9 +1,9 @@
 import api from "./axios";
 
 export const authAPI = {
-  signin: async (credentials) => {
-    const res = await api.post("/auth/signin", credentials);
-    return res.data.data;
+  signin: async ({ identifier, password }) => {
+    const res = await api.post("/auth/signin", { identifier, password });
+    return res.data.data; // { user, accessToken }
   },
   signup: async (credentials) => {
     const res = await api.post("/auth/signup", credentials);

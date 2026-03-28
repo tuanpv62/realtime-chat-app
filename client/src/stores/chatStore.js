@@ -50,6 +50,19 @@ export const useChatStore = create((set, get) => ({
     set((state) => ({
       conversations: [conversation, ...state.conversations],
     })),
+  // addConversation: (conversation) => {
+  //   set((state) => {
+  //     const convId = conversation.id || conversation._id;
+  //     // Tránh thêm duplicate
+  //     const exists = state.conversations.some(
+  //       (c) => (c.id || c._id) === convId,
+  //     );
+  //     if (exists) return state;
+  //     return {
+  //       conversations: [conversation, ...state.conversations],
+  //     };
+  //   });
+  // },
 
   updateConversation: (conversationId, updates) =>
     set((state) => ({

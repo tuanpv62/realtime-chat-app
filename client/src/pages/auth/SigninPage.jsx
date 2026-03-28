@@ -1,14 +1,18 @@
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, MessageSquare, Loader2 } from 'lucide-react';
-
+import { Eye, EyeOff, MessageSquare, Loader2, AtSign } from 'lucide-react';
+import { cn } from '@/utils/cn';
 import { signinSchema } from '@/utils/validators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card, CardContent, CardDescription,
+  CardHeader, CardTitle,
+} from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { useAuthStore } from '@/stores/authStore';
@@ -26,13 +30,13 @@ export default function SigninPage() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(signinSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { identifier: '', password: '' },
   });
 
   const onSubmit = async (data) => {
     setServerError('');
     try {
-      await signin(data);
+      await signin(data); // { identifier, password }
       navigate('/chat');
     } catch (err) {
       setServerError(err.message || 'Đăng nhập thất bại');
@@ -56,9 +60,11 @@ export default function SigninPage() {
 
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Chào mừng trở lại</CardTitle>
+            <CardTitle className="text-2xl text-center">
+              Chào mừng trở lại
+            </CardTitle>
             <CardDescription className="text-center">
-              Đăng nhập vào tài khoản của bạn
+              Đăng nhập bằng email hoặc username
             </CardDescription>
           </CardHeader>
 
@@ -69,26 +75,41 @@ export default function SigninPage() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-              {/* Email */}
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="space-y-4"
+              noValidate
+            >
+              {/* Identifier field */}
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@example.com"
-                  autoComplete="email"
-                  {...register('email')}
-                  className={errors.email ? 'border-destructive' : ''}
-                />
-                {errors.email && (
-                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                <Label htmlFor="identifier">Email hoặc Username</Label>
+                <div className="relative">
+                  <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="identifier"
+                    type="text"
+                    placeholder="email@example.com hoặc username"
+                    autoComplete="username"
+                    autoFocus
+                    {...register('identifier')}
+                    className={cn(
+                      'pl-9',
+                      errors.identifier && 'border-destructive'
+                    )}
+                  />
+                </div>
+                {errors.identifier && (
+                  <p className="text-xs text-destructive">
+                    {errors.identifier.message}
+                  </p>
                 )}
               </div>
 
-              {/* Password */}
+              {/* Password field */}
               <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                </div>
                 <div className="relative">
                   <Input
                     id="password"
@@ -96,23 +117,36 @@ export default function SigninPage() {
                     placeholder="Nhập password"
                     autoComplete="current-password"
                     {...register('password')}
-                    className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
+                    className={cn(
+                      'pr-10',
+                      errors.password && 'border-destructive'
+                    )}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     tabIndex={-1}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword
+                      ? <EyeOff className="h-4 w-4" />
+                      : <Eye className="h-4 w-4" />
+                    }
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-xs text-destructive">{errors.password.message}</p>
+                  <p className="text-xs text-destructive">
+                    {errors.password.message}
+                  </p>
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              {/* Submit */}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

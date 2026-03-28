@@ -105,10 +105,11 @@ export const useAuthStore = create((set) => ({
     }
   },
 
-  signin: async (credentials) => {
+  // Thay đổi: nhận { identifier, password } thay vì { email, password }
+  signin: async ({ identifier, password }) => {
     set({ isLoading: true });
     try {
-      const data = await authAPI.signin(credentials);
+      const data = await authAPI.signin({ identifier, password });
       set({
         user: data.user,
         accessToken: data.accessToken,
@@ -158,18 +159,18 @@ export const useAuthStore = create((set) => ({
   //   }
   // },
   initializeAuth: async () => {
-  try {
-    // ❌ bỏ getMe trước
-    const data = await authAPI.refreshToken();
-    set({
-      user: data.user,
-      accessToken: data.accessToken,
-      isInitialized: true,
-    });
-  } catch {
-    set({ user: null, accessToken: null, isInitialized: true });
-  }
-},
+    try {
+      // ❌ bỏ getMe trước
+      const data = await authAPI.refreshToken();
+      set({
+        user: data.user,
+        accessToken: data.accessToken,
+        isInitialized: true,
+      });
+    } catch {
+      set({ user: null, accessToken: null, isInitialized: true });
+    }
+  },
 
   setAccessToken: (token) => set({ accessToken: token }),
 }));

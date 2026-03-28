@@ -44,15 +44,34 @@ export const signupService = async ({ username, email, password }) => {
 };
 
 // ─── Signin Service (giữ nguyên) ─────────────────────────────────
-export const signinService = async ({ email, password }) => {
-  const user = await User.findOne({ email: email.toLowerCase().trim() }).select(
-    "+password +refreshToken",
-  );
+export const signinService = async ({ identifier, password }) => {
+  // identifier = email hoặc username
+  // Phát hiện loại: có @ → email, không có → username
+  const isEmail = identifier.includes("@");
 
-  if (!user) throw new AppError("Invalid credentials", 401);
+  let user;
+
+  if (isEmail) {
+    // Tìm theo email
+    user = await User.findOne({
+      email: identifier.toLowerCase().trim(),
+    }).select("+password +refreshToken");
+  } else {
+    // Tìm theo username (đã lowercase trong schema)
+    user = await User.findOne({
+      username: identifier.toLowerCase().trim(),
+    }).select("+password +refreshToken");
+  }
+
+  // Cùng 1 message cho cả 2 trường hợp → tránh leak thông tin
+  if (!user) {
+    throw new AppError("Invalid credentials", 401);
+  }
 
   const isPasswordCorrect = await user.comparePassword(password);
-  if (!isPasswordCorrect) throw new AppError("Invalid credentials", 401);
+  if (!isPasswordCorrect) {
+    throw new AppError("Invalid credentials", 401);
+  }
 
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
