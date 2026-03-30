@@ -68,3 +68,50 @@
 ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground; }
 /* bật dark mode bằng class */
 /* @custom-variant dark (&:where(.dark, .dark *)); */
+
+
+/* Thêm vào cuối file */
+
+/* ── PWA Standalone mode ──────────────────────────────────────── */
+@media (display-mode: standalone) {
+  /* Safe area iPhone notch + home indicator */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Ẩn browser UI hints */
+  * {
+    overscroll-behavior: none;
+  }
+}
+
+/* ── Smooth animations ────────────────────────────────────────── */
+@keyframes slide-in-from-bottom-4 {
+  from { transform: translateY(1rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-in-from-top-4 {
+  from { transform: translateY(-1rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes zoom-in-50 {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+  animation-duration: 0.3s;
+}
+
+.slide-in-from-bottom-4 { animation-name: slide-in-from-bottom-4; }
+.slide-in-from-top-4 { animation-name: slide-in-from-top-4; }
+.zoom-in-50 {
+  animation-name: zoom-in-50;
+  animation-duration: 0.5s;
+}
+.duration-400 { animation-duration: 0.4s; }
+.duration-500 { animation-duration: 0.5s; }

@@ -1,10 +1,63 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>client</title>
+
+    <!-- ── PWA Essential ─────────────────────────────────────── -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#3b82f6"
+          media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1e3a5f"
+          media="(prefers-color-scheme: dark)" />
+
+    <!-- ── Viewport ─────────────────────────────────────────── -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0,
+                   maximum-scale=1.0, user-scalable=no,
+                   viewport-fit=cover" />
+
+    <!-- ── iOS PWA ──────────────────────────────────────────── -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ChatNoiBo" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="152x152"
+          href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="144x144"
+          href="/icons/icon-144x144.png" />
+
+    <!-- iOS Splash Screens (iPhone 14 Pro Max) -->
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+          href="/icons/icon-512x512.png" />
+
+    <!-- ── Android ──────────────────────────────────────────── -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- ── SEO / Social ─────────────────────────────────────── -->
+    <title>ChatNoiBo</title>
+    <meta name="description"
+          content="Ứng dụng chat realtime — Kết nối mọi lúc mọi nơi" />
+    <meta name="keywords" content="chat, nhắn tin, realtime, ChatNoiBo" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ChatNoiBo" />
+    <meta property="og:description"
+          content="Ứng dụng chat realtime" />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+    <meta property="og:url" content="https://chatnoibo.site" />
+
+    <!-- ── Favicon ───────────────────────────────────────────── -->
+    <link rel="icon" type="image/png" sizes="32x32"
+          href="/icons/icon-96x96.png" />
+    <link rel="icon" type="image/png" sizes="16x16"
+          href="/icons/icon-72x72.png" />
+
+    <!-- ── Performance ──────────────────────────────────────── -->
+    <link rel="preconnect" href="https://res.cloudinary.com" />
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
   </head>
   <body>
     <div id="root"></div>

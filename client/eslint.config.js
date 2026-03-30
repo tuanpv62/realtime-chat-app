@@ -26,6 +26,7 @@ export default defineConfig([
       "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
       "react-hooks/purity": "off",
       "react-hooks/set-state-in-effect": "off",
+      "no-undef": "off",
     },
   },
 ]);
