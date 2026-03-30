@@ -21,7 +21,21 @@ export function usePWA() {
       console.error("❌ SW registration error:", error);
     },
   });
+useEffect(() => {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    console.log("🔥 READY INSTALL");
+  });
 
+  document.addEventListener("click", () => {
+    console.log("User interacted");
+  });
+}, []);
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        window.dispatchEvent(new Event("beforeinstallprompt"));
+      }, 2000);
+    });
+    
   useEffect(() => {
     // Detect iOS
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -54,15 +68,7 @@ export function usePWA() {
       window.removeEventListener("appinstalled", handleInstalled);
     };
   }, []);
-useEffect(() => {
-  window.addEventListener("beforeinstallprompt", (e) => {
-    console.log("🔥 READY INSTALL");
-  });
 
-  document.addEventListener("click", () => {
-    console.log("User interacted");
-  });
-}, []);
   // ── Trigger install (Android) ────────────────────────────────
   const handleInstall = async () => {
     if (!installPrompt) return;
