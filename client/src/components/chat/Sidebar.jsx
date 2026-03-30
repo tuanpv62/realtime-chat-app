@@ -1,10 +1,10 @@
 /* eslint-disable no-unused-vars */
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   MessageSquare, Users, UserPlus,
   Search, Plus, LogOut, Settings,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ import { CreateGroupModal } from './CreateGroupModal';
 import { useAuthStore } from '@/stores/authStore';
 import { useChatStore } from '@/stores/chatStore';
 import { chatAPI, friendAPI } from '@/api/chat.api';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 
 const TABS = [
   { id: 'chats', icon: MessageSquare, label: 'Tin nhắn' },
@@ -37,15 +38,12 @@ const TABS = [
 
 export function Sidebar() {
   const navigate = useNavigate();
+  const { isMobile } = useBreakpoint();
   const { user, signout } = useAuthStore();
   const {
-    conversations,
-    activeConversation,
-    setConversations,
-    setActiveConversation,
-    addConversation,
-    getTotalUnread,
-    isUserOnline,
+    conversations, activeConversation,
+    setConversations, setActiveConversation,
+    addConversation, getTotalUnread, isUserOnline,
   } = useChatStore();
 
   const [activeTab, setActiveTab] = useState('chats');
@@ -54,40 +52,19 @@ export function Sidebar() {
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
 
-  // ── Load conversations khi mount ────────────────────────────────
   useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const data = await chatAPI.getConversations();
-        setConversations(data);
-      } catch (err) {
-        console.error('Failed to load conversations:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
+    chatAPI.getConversations()
+      .then(setConversations)
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
   }, []);
 
-  // ── Mở / Tạo Direct Conversation từ Friend list ─────────────────
   const handleOpenDirectChat = useCallback(async (friendId) => {
     try {
-      // Lấy hoặc tạo conversation mới
       const conversation = await chatAPI.getOrCreateDirect(friendId);
       const convId = conversation.id || conversation._id;
-
-      // Kiểm tra conversation đã có trong list chưa
-      const exists = conversations.some(
-        (c) => (c.id || c._id) === convId
-      );
-
-      // Nếu chưa có → thêm vào đầu danh sách
-      if (!exists) {
-        addConversation(conversation);
-      }
-
-      // Set active + chuyển về tab chats
+      const exists = conversations.some((c) => (c.id || c._id) === convId);
+      if (!exists) addConversation(conversation);
       setActiveConversation(conversation);
       setActiveTab('chats');
     } catch (err) {
@@ -95,13 +72,10 @@ export function Sidebar() {
     }
   }, [conversations, addConversation, setActiveConversation]);
 
-  // ── Filter search ───────────────────────────────────────────────
-  const filteredConversations = conversations.filter((conv) => {
+  const filtered = conversations.filter((conv) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    if (conv.type === 'group') {
-      return conv.name?.toLowerCase().includes(q);
-    }
+    if (conv.type === 'group') return conv.name?.toLowerCase().includes(q);
     return conv.participants?.some(
       (p) =>
         p.username?.toLowerCase().includes(q) ||
@@ -109,135 +83,155 @@ export function Sidebar() {
     );
   });
 
-  const directChats = filteredConversations.filter((c) => c.type === 'direct');
-  const groupChats  = filteredConversations.filter((c) => c.type === 'group');
+  const directChats = filtered.filter((c) => c.type === 'direct');
+  const groupChats  = filtered.filter((c) => c.type === 'group');
   const totalUnread = getTotalUnread();
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-full">
+      <div className="flex h-full w-full">
 
-        {/* ── Icon Rail ──────────────────────────────────────────── */}
-        <div className="w-14 flex flex-col items-center py-3 gap-1 border-r bg-card shrink-0">
-
-          {/* Logo */}
-          <div className="p-2 mb-1">
-            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-              <MessageSquare className="h-4 w-4 text-primary-foreground" />
+        {/* ── Icon Rail (ẩn trên mobile) ─────────────────────── */}
+        {!isMobile && (
+          <div className="w-14 flex flex-col items-center py-3 gap-1 border-r bg-card shrink-0">
+            {/* Logo */}
+            <div className="p-1.5 mb-1">
+              <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-4 w-4 text-primary-foreground" />
+              </div>
             </div>
-          </div>
 
-          <Separator className="w-8 my-1" />
+            <Separator className="w-8 my-1" />
 
-          {/* Tab buttons */}
-          {/* // eslint-disable-next-line no-unused-vars */}
-          {TABS.map(({ id, icon: Icon, label }) => (
-            <Tooltip key={id}>
+            {TABS.map(({ id, icon: Icon, label }) => (
+              <Tooltip key={id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={activeTab === id ? 'secondary' : 'ghost'}
+                    size="icon"
+                    onClick={() => setActiveTab(id)}
+                    className="relative"
+                  >
+                    <Icon className="h-5 w-5" />
+                    {id === 'chats' && totalUnread > 0 && (
+                      <UnreadBadge
+                        count={totalUnread}
+                        className="absolute -top-1 -right-1 text-[9px] h-4 min-w-[1rem]"
+                      />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{label}</TooltipContent>
+              </Tooltip>
+            ))}
+
+            <Separator className="w-8 my-1" />
+
+            <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={activeTab === id ? 'secondary' : 'ghost'}
-                  size="icon"
-                  onClick={() => setActiveTab(id)}
-                  className="relative"
-                >
-                  <Icon className="h-5 w-5" />
-                  {id === 'chats' && totalUnread > 0 && (
-                    <UnreadBadge
-                      count={totalUnread}
-                      className="absolute -top-1 -right-1 text-[9px] h-4 min-w-[1rem]"
-                    />
-                  )}
+                <Button variant="ghost" size="icon"
+                  onClick={() => setShowAddFriend(true)}>
+                  <UserPlus className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">{label}</TooltipContent>
+              <TooltipContent side="right">Thêm bạn</TooltipContent>
             </Tooltip>
-          ))}
 
-          <Separator className="w-8 my-1" />
+            <div className="flex-1" />
+            <ThemeToggle />
 
-          {/* Add Friend */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowAddFriend(true)}
-              >
-                <UserPlus className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Thêm bạn</TooltipContent>
-          </Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-1 rounded-full hover:ring-2 hover:ring-primary transition-all mt-1">
+                  <UserAvatar user={user} size="sm" showStatus />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="end" className="w-48">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-sm font-medium">{user?.displayName}</p>
+                    <p className="text-xs text-muted-foreground">@{user?.username}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <Settings className="h-4 w-4 mr-2" /> Trang cá nhân
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={signout}
+                >
+                  <LogOut className="h-4 w-4 mr-2" /> Đăng xuất
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
 
-          <div className="flex-1" />
+        {/* ── Main Panel ─────────────────────────────────────── */}
+        <div className={cn(
+          'flex flex-col border-r bg-background',
+          isMobile ? 'w-full' : 'w-72',
+        )}>
 
-          {/* Theme Toggle */}
-          <ThemeToggle />
+          {/* Mobile Header */}
+          {isMobile && (
+            <MobileHeader
+              user={user}
+              totalUnread={totalUnread}
+              onAddFriend={() => setShowAddFriend(true)}
+              onSignout={signout}
+              onProfile={() => navigate('/profile')}
+            />
+          )}
 
-          {/* User Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-1 rounded-full hover:ring-2 hover:ring-primary transition-all mt-1">
-                <UserAvatar
-                  user={user}
-                  size="sm"
-                  showStatus
-                />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="end" className="w-48">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col gap-0.5">
-                  <p className="text-sm font-medium leading-none">
-                    {user?.displayName || user?.username}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    @{user?.username}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
-                <Settings className="h-4 w-4 mr-2" />
-                Trang cá nhân
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={signout}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Đăng xuất
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* ── Main Panel ─────────────────────────────────────────── */}
-        <div className="w-72 flex flex-col border-r bg-background">
-
-          {/* Header */}
-          <div className="p-4 pb-2 shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-base">
-                {activeTab === 'chats' ? 'Tin nhắn' : 'Bạn bè'}
-              </h2>
-              {activeTab === 'chats' && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setShowCreateGroup(true)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Tạo nhóm</TooltipContent>
-                </Tooltip>
-              )}
+          {/* Tab Bar */}
+          <div className="px-3 pt-3 pb-2 shrink-0">
+            {/* Mobile: Tab bar di chuyển lên trên */}
+            <div className={cn(
+              'flex gap-1 mb-3',
+              isMobile ? 'justify-around' : 'hidden'
+            )}>
+              {TABS.map(({ id, icon: Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors',
+                    activeTab === id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                  {id === 'chats' && totalUnread > 0 && (
+                    <UnreadBadge count={totalUnread} className="text-[9px] h-4" />
+                  )}
+                </button>
+              ))}
             </div>
+
+            {/* Title + Action (Desktop) */}
+            {!isMobile && (
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-base">
+                  {activeTab === 'chats' ? 'Tin nhắn' : 'Bạn bè'}
+                </h2>
+                {activeTab === 'chats' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={() => setShowCreateGroup(true)}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Tạo nhóm</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            )}
 
             {/* Search */}
             <div className="relative">
@@ -246,18 +240,18 @@ export function Sidebar() {
                 placeholder="Tìm kiếm..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 text-sm bg-muted border-0 focus-visible:ring-1"
+                className="pl-8 h-9 text-sm bg-muted border-0 focus-visible:ring-1"
               />
             </div>
           </div>
 
-          {/* ── Tab: Chats ─────────────────────────────────────── */}
+          {/* ── Tab: Chats ──────────────────────────────────── */}
           {activeTab === 'chats' && (
             <ScrollArea className="flex-1">
               <div className="px-2 pb-4">
                 {isLoading ? (
                   <ConversationListSkeleton count={6} />
-                ) : filteredConversations.length === 0 ? (
+                ) : filtered.length === 0 ? (
                   <ChatEmptyState
                     hasSearch={!!searchQuery}
                     onAddFriend={() => setShowAddFriend(true)}
@@ -265,7 +259,6 @@ export function Sidebar() {
                   />
                 ) : (
                   <>
-                    {/* Direct Messages */}
                     {directChats.length > 0 && (
                       <SectionGroup label="Tin nhắn trực tiếp">
                         {directChats.map((conv) => (
@@ -281,12 +274,10 @@ export function Sidebar() {
                         ))}
                       </SectionGroup>
                     )}
-
-                    {/* Group Chats */}
                     {groupChats.length > 0 && (
                       <SectionGroup
                         label="Nhóm"
-                        className={directChats.length > 0 ? 'mt-2' : ''}
+                        className={directChats.length > 0 ? 'mt-3' : ''}
                       >
                         {groupChats.map((conv) => (
                           <ChatCard
@@ -307,13 +298,36 @@ export function Sidebar() {
             </ScrollArea>
           )}
 
-          {/* ── Tab: Friends ───────────────────────────────────── */}
+          {/* ── Tab: Friends ─────────────────────────────────── */}
           {activeTab === 'friends' && (
             <ScrollArea className="flex-1">
               <div className="px-2 pb-4">
+                {/* Mobile: Nút tạo nhóm + thêm bạn */}
+                {isMobile && (
+                  <div className="flex gap-2 p-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => setShowAddFriend(true)}
+                    >
+                      <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                      Thêm bạn
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => setShowCreateGroup(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      Tạo nhóm
+                    </Button>
+                  </div>
+                )}
                 <FriendsList
                   searchQuery={searchQuery}
-                  onStartChat={handleOpenDirectChat}  // ✅ Đã wire up
+                  onStartChat={handleOpenDirectChat}
                   isUserOnline={isUserOnline}
                 />
               </div>
@@ -322,11 +336,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Modals */}
-      <AddFriendModal
-        open={showAddFriend}
-        onClose={() => setShowAddFriend(false)}
-      />
+      <AddFriendModal open={showAddFriend} onClose={() => setShowAddFriend(false)} />
       <CreateGroupModal
         open={showCreateGroup}
         onClose={() => setShowCreateGroup(false)}
@@ -340,7 +350,53 @@ export function Sidebar() {
   );
 }
 
-// ── Section Label ─────────────────────────────────────────────────
+// ── Mobile Header ──────────────────────────────────────────────────
+function MobileHeader({ user, totalUnread, onAddFriend, onSignout, onProfile }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
+      <div className="flex items-center gap-2">
+        <div className="h-7 w-7 bg-primary rounded-lg flex items-center justify-center">
+          <MessageSquare className="h-4 w-4 text-primary-foreground" />
+        </div>
+        <span className="font-bold text-base">ChatApp</span>
+        {totalUnread > 0 && <UnreadBadge count={totalUnread} />}
+      </div>
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
+        <Button variant="ghost" size="icon" className="h-8 w-8"
+          onClick={onAddFriend}>
+          <UserPlus className="h-4 w-4" />
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="ml-1">
+              <UserAvatar user={user} size="sm" showStatus />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel className="font-normal">
+              <p className="text-sm font-medium">{user?.displayName}</p>
+              <p className="text-xs text-muted-foreground">@{user?.username}</p>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onProfile}>
+              <Settings className="h-4 w-4 mr-2" /> Trang cá nhân
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={onSignout}
+            >
+              <LogOut className="h-4 w-4 mr-2" /> Đăng xuất
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+// ── Section Group ─────────────────────────────────────────────────
 function SectionGroup({ label, children, className = '' }) {
   return (
     <div className={className}>
@@ -359,8 +415,7 @@ function FriendsList({ searchQuery, onStartChat, isUserOnline }) {
   const [openingId, setOpeningId] = useState(null);
 
   useEffect(() => {
-    friendAPI
-      .getFriends()
+    friendAPI.getFriends()
       .then(setFriends)
       .catch(console.error)
       .finally(() => setIsLoading(false));
@@ -378,34 +433,26 @@ function FriendsList({ searchQuery, onStartChat, isUserOnline }) {
   const handleClick = async (friendId) => {
     if (openingId) return;
     setOpeningId(friendId);
-    try {
-      await onStartChat(friendId);
-    } finally {
-      setOpeningId(null);
-    }
+    try { await onStartChat(friendId); }
+    finally { setOpeningId(null); }
   };
 
   if (isLoading) return <ConversationListSkeleton count={4} />;
 
   if (friends.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+      <div className="flex flex-col items-center justify-center py-10 text-center px-4">
         <Users className="h-10 w-10 text-muted-foreground mb-3" />
         <p className="text-sm font-medium">Chưa có bạn bè</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Thêm bạn để bắt đầu trò chuyện
-        </p>
+        <p className="text-xs text-muted-foreground mt-1">Thêm bạn để nhắn tin</p>
       </div>
     );
   }
 
   if (filtered.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-        <Search className="h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-sm text-muted-foreground">
-          Không tìm thấy "{searchQuery}"
-        </p>
+      <div className="py-8 text-center">
+        <p className="text-sm text-muted-foreground">Không tìm thấy "{searchQuery}"</p>
       </div>
     );
   }
@@ -416,36 +463,28 @@ function FriendsList({ searchQuery, onStartChat, isUserOnline }) {
         const fId = friend.id || friend._id;
         const online = isUserOnline(fId);
         const isOpening = openingId === fId;
-
         return (
           <button
             key={fId}
             onClick={() => handleClick(fId)}
             disabled={isOpening}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent text-left transition-colors disabled:opacity-60"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent text-left transition-colors disabled:opacity-60 group"
           >
-            <UserAvatar
-              user={{ ...friend, isOnline: online }}
-              size="sm"
-              showStatus
-            />
+            <UserAvatar user={{ ...friend, isOnline: online }} size="sm" showStatus />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
                 {friend.displayName || friend.username}
               </p>
               <p className={cn(
-                'text-xs truncate',
+                'text-xs',
                 online ? 'text-green-500' : 'text-muted-foreground'
               )}>
                 {online ? '● Online' : '○ Offline'}
               </p>
             </div>
-            {/* Icon nhắn tin */}
             <MessageSquare className={cn(
-              'h-4 w-4 shrink-0 transition-colors',
-              isOpening
-                ? 'text-primary animate-pulse'
-                : 'text-muted-foreground opacity-0 group-hover:opacity-100'
+              'h-4 w-4 shrink-0 text-muted-foreground transition-opacity',
+              isOpening ? 'opacity-100 text-primary animate-pulse' : 'opacity-0 group-hover:opacity-100'
             )} />
           </button>
         );
@@ -461,13 +500,9 @@ function ChatEmptyState({ hasSearch, onAddFriend, onSwitchToFriends }) {
       <div className="flex flex-col items-center justify-center py-12 text-center px-4">
         <Search className="h-10 w-10 text-muted-foreground mb-3" />
         <p className="text-sm font-medium">Không tìm thấy</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Thử tìm với từ khoá khác
-        </p>
       </div>
     );
   }
-
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center px-4">
       <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -475,26 +510,14 @@ function ChatEmptyState({ hasSearch, onAddFriend, onSwitchToFriends }) {
       </div>
       <p className="text-sm font-semibold mb-1">Chưa có tin nhắn nào</p>
       <p className="text-xs text-muted-foreground mb-5 leading-relaxed">
-        Bắt đầu trò chuyện bằng cách chọn bạn bè hoặc thêm bạn mới
+        Bắt đầu trò chuyện bằng cách chọn bạn bè
       </p>
       <div className="flex flex-col gap-2 w-full">
-        {/* ✅ Nút chuyển sang tab Friends để chọn bạn chat */}
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full"
-          onClick={onSwitchToFriends}
-        >
-          <Users className="h-4 w-4 mr-2" />
-          Chọn bạn để nhắn tin
+        <Button size="sm" variant="outline" className="w-full" onClick={onSwitchToFriends}>
+          <Users className="h-4 w-4 mr-2" /> Chọn bạn để nhắn tin
         </Button>
-        <Button
-          size="sm"
-          className="w-full"
-          onClick={onAddFriend}
-        >
-          <UserPlus className="h-4 w-4 mr-2" />
-          Thêm bạn mới
+        <Button size="sm" className="w-full" onClick={onAddFriend}>
+          <UserPlus className="h-4 w-4 mr-2" /> Thêm bạn mới
         </Button>
       </div>
     </div>

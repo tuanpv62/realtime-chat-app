@@ -1,10 +1,9 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import {
-  Phone, Video, Info, ArrowDown,
+  Phone, Video, Info, ArrowDown, ArrowLeft,
 } from 'lucide-react';
-
-// eslint-disable-next-line no-unused-vars
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/shared/UserAvatar';
@@ -20,6 +19,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { chatAPI } from '@/api/chat.api';
 import { useConversationSocket } from '@/hooks/useConversationSocket';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { useBreakpoint } from '@/hooks/useBreakpoint'; // ✅ Thêm dòng này
 
 function groupMessages(messages) {
   return messages.map((msg, index) => {
@@ -65,13 +65,19 @@ function EditInput({ message, onSave, onCancel }) {
   );
 }
 
-export function ChatWindow() {
+export function ChatWindow({ onBack }) {
+  // ✅ Khai báo isMobile từ useBreakpoint ngay trong component
+  const { isMobile } = useBreakpoint();
+
   const { user: currentUser } = useAuthStore();
   const {
     activeConversation,
-  
+    getMessages,
     setMessages,
     appendMessages,
+    addMessage,
+ 
+    updateMessage,
     isUserOnline,
     hasMoreMessages,
   } = useChatStore();
@@ -84,31 +90,15 @@ export function ChatWindow() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const virtuosoRef = useRef(null);
 
-// const conversationId =
-  //   (activeConversation?.id || activeConversation?._id)?.toString();
-    const conversationId = (
-  activeConversation?._id ||
-  activeConversation?.id
-  )?.toString();
+  const conversationId = activeConversation?.id || activeConversation?._id;
+  const messages = getMessages(conversationId);
+  const groupedMessages = groupMessages(messages);
 
-const messages = useChatStore(
-  (state) => state.messages[conversationId]
-  );
-
-  
-
-console.log("CHAT WINDOW ID:", conversationId);
-
-  
-  const safeMessages = messages || [];
- const groupedMessages = groupMessages(safeMessages);
-
-  // 🆕 Socket hooks
   const { handleTyping, typingUsers } = useConversationSocket(conversationId);
   const { sendMessage, editMessage, deleteMessage, reactToMessage } =
     useRealtimeMessages(conversationId);
 
-  // Load messages
+  // Load messages khi đổi conversation
   useEffect(() => {
     if (!conversationId) return;
     setIsLoading(true);
@@ -131,17 +121,17 @@ console.log("CHAT WINDOW ID:", conversationId);
 
   // Scroll to bottom khi có message mới
   useEffect(() => {
-    if (safeMessages.length > 0) {
+    if (messages.length > 0) {
       setTimeout(() => {
         virtuosoRef.current?.scrollToIndex({
-          index: safeMessages.length - 1,
+          index: messages.length - 1,
           behavior: 'smooth',
         });
       }, 100);
     }
-  }, [safeMessages.length]);
+  }, [messages.length]);
 
-  // Load more (infinite scroll)
+  // Load more — infinite scroll
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMoreMessages[conversationId]) return;
     setIsLoadingMore(true);
@@ -166,17 +156,11 @@ console.log("CHAT WINDOW ID:", conversationId);
     }
   }, [conversationId, isLoadingMore, page, hasMoreMessages]);
 
-  // Handle send (via socket)
   const handleSend = async ({ content, type = 'text', replyTo: replyId }) => {
-    await sendMessage({
-      content,
-      type,
-      replyTo: replyId,
-    });
+    await sendMessage({ content, type, replyTo: replyId });
     setReplyTo(null);
   };
 
-  // Handle edit
   const handleEditSave = async (newContent) => {
     if (!editingMessage || !newContent.trim()) return;
     try {
@@ -201,19 +185,21 @@ console.log("CHAT WINDOW ID:", conversationId);
     ? isUserOnline(otherUser.id || otherUser._id)
     : false;
 
-  // Typing indicator display
-  const typingArray = [...typingUsers].filter((id) => id !== currentUser?.id);
+  const typingArray = [...typingUsers].filter(
+    (id) => id !== currentUser?.id
+  );
 
+  // Empty state
   if (!activeConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background">
-        <div className="text-center space-y-3 animate-fade-in">
+        <div className="text-center space-y-3 animate-fade-in px-4">
           <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mx-auto">
             <span className="text-4xl">💬</span>
           </div>
           <h3 className="text-lg font-semibold">Chọn một cuộc trò chuyện</h3>
           <p className="text-sm text-muted-foreground max-w-sm">
-            Chọn từ danh sách bên trái hoặc tìm bạn bè để bắt đầu
+            Chọn từ danh sách bên trái để bắt đầu
           </p>
         </div>
       </div>
@@ -222,23 +208,42 @@ console.log("CHAT WINDOW ID:", conversationId);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
-      {/* Header */}
+
+      {/* ── Header ─────────────────────────────────────────────── */}
       {isLoading ? (
         <ChatHeaderSkeleton />
       ) : (
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b bg-card shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+
+            {/* ✅ isMobile giờ đã được khai báo ở trên */}
+            {isMobile && onBack && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 -ml-1"
+                onClick={onBack}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
+
             <UserAvatar
               user={
                 isGroup
-                  ? { displayName: activeConversation.name, avatar: activeConversation.groupAvatar }
+                  ? {
+                      displayName: activeConversation.name,
+                      avatar: activeConversation.groupAvatar,
+                    }
                   : otherUser
               }
-              size="md"
+              size="sm"
               showStatus={!isGroup}
+              className="shrink-0"
             />
-            <div>
-              <p className="font-semibold text-sm">{displayName}</p>
+
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm truncate">{displayName}</p>
               {isGroup ? (
                 <p className="text-xs text-muted-foreground">
                   {activeConversation.participants?.length} thành viên
@@ -252,13 +257,19 @@ console.log("CHAT WINDOW ID:", conversationId);
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Phone className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Video className="h-4 w-4" />
-            </Button>
+
+          {/* Actions */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {!isMobile && (
+              <>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Phone className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Video className="h-4 w-4" />
+                </Button>
+              </>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <Info className="h-4 w-4" />
             </Button>
@@ -266,18 +277,19 @@ console.log("CHAT WINDOW ID:", conversationId);
         </div>
       )}
 
-      {/* Messages */}
+      {/* ── Messages ─────────────────────────────────────────────── */}
       <div className="flex-1 relative overflow-hidden">
         {isLoading ? (
           <MessageListSkeleton />
         ) : (
-            
           <Virtuoso
             ref={virtuosoRef}
             data={groupedMessages}
             followOutput="smooth"
             initialTopMostItemIndex={Math.max(0, groupedMessages.length - 1)}
-            startReached={hasMoreMessages[conversationId] ? loadMore : undefined}
+            startReached={
+              hasMoreMessages[conversationId] ? loadMore : undefined
+            }
             atBottomStateChange={(atBottom) => setShowScrollBtn(!atBottom)}
             style={{ height: '100%' }}
             components={{
@@ -288,28 +300,32 @@ console.log("CHAT WINDOW ID:", conversationId);
                   </div>
                 ) : null,
             }}
-              itemContent={(_, message) => (
-              
+            itemContent={(_, message) => (
               <div key={message.id || message._id} className="py-0.5">
-                {(editingMessage && editingMessage._id === message._id) ? (
-                  <EditInput
-                    message={message}
-                    onSave={handleEditSave}
-                    onCancel={() => setEditingMessage(null)}
-                    
-                  />
-                  
-                ) : (
-                  <MessageCard
-                    message={message}
-                    showAvatar={message.showAvatar}
-                    showSenderName={isGroup && message.showSenderName}
-                    onReply={setReplyTo}
-                    onEdit={setEditingMessage}
-                    onReact={reactToMessage}
-                    onDelete={deleteMessage}
-                  />
-                )}
+                {/* // ✅ Fix — Phải check editingMessage tồn tại TRƯỚC */}
+{editingMessage && (
+  (editingMessage.id && editingMessage.id === message.id) ||
+  (editingMessage._id && editingMessage._id === message._id) ||
+  // Fallback: so sánh toString() để handle cả ObjectId
+  editingMessage._id?.toString() === message._id?.toString() ||
+  editingMessage.id?.toString() === message.id?.toString()
+) ? (
+  <EditInput
+    message={message}
+    onSave={handleEditSave}
+    onCancel={() => setEditingMessage(null)}
+  />
+) : (
+  <MessageCard
+    message={message}
+    showAvatar={message.showAvatar}
+    showSenderName={isGroup && message.showSenderName}
+    onReply={setReplyTo}
+    onEdit={setEditingMessage}
+    onReact={reactToMessage}
+    onDelete={deleteMessage}
+  />
+)}
               </div>
             )}
           />
@@ -332,7 +348,7 @@ console.log("CHAT WINDOW ID:", conversationId);
         )}
       </div>
 
-      {/* Typing Indicator */}
+      {/* ── Typing Indicator ─────────────────────────────────────── */}
       {typingArray.length > 0 && (
         <div className="px-4 py-1 shrink-0">
           <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -350,7 +366,7 @@ console.log("CHAT WINDOW ID:", conversationId);
         </div>
       )}
 
-      {/* Input */}
+      {/* ── Input ────────────────────────────────────────────────── */}
       <MessageInput
         onSend={handleSend}
         onTyping={handleTyping}

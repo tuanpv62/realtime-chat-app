@@ -140,7 +140,7 @@ export default function ProfilePage() {
         </h1>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+  <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* ── Profile Header Card ─────────────────────────────── */}
         <div className="rounded-xl border bg-card overflow-hidden">
           {/* Cover gradient */}
