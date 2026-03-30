@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 
@@ -53,7 +54,15 @@ export function usePWA() {
       window.removeEventListener("appinstalled", handleInstalled);
     };
   }, []);
+useEffect(() => {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    console.log("🔥 READY INSTALL");
+  });
 
+  document.addEventListener("click", () => {
+    console.log("User interacted");
+  });
+}, []);
   // ── Trigger install (Android) ────────────────────────────────
   const handleInstall = async () => {
     if (!installPrompt) return;
