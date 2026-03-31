@@ -3,13 +3,13 @@ import { useState, useEffect } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 
 export function usePWA() {
-  // ── Install prompt ───────────────────────────────────────────
+  // ── Install state ───────────────────────────────────────────
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
-  // ── Service Worker update ────────────────────────────────────
+  // ── Service Worker update ───────────────────────────────────
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -21,43 +21,32 @@ export function usePWA() {
       console.error("❌ SW registration error:", error);
     },
   });
-useEffect(() => {
-  window.addEventListener("beforeinstallprompt", (e) => {
-    console.log("🔥 READY INSTALL");
-  });
 
-  document.addEventListener("click", () => {
-    console.log("User interacted");
-  });
-}, []);
-    window.addEventListener("load", () => {
-      setTimeout(() => {
-        window.dispatchEvent(new Event("beforeinstallprompt"));
-      }, 2000);
-    });
-    
+  // ── MAIN LOGIC ───────────────────────────────────────────────
   useEffect(() => {
     // Detect iOS
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
     setIsIOS(ios);
 
-    // Detect đã cài chưa
+    // Detect standalone (đã cài)
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone === true;
+
     setIsInstalled(isStandalone);
 
-    // Lắng nghe beforeinstallprompt (Android/Chrome)
+    // Khi Chrome cho phép cài
     const handlePrompt = (e) => {
-      e.preventDefault();
+      e.preventDefault(); // 🔥 QUAN TRỌNG
+      console.log("🔥 READY INSTALL");
       setInstallPrompt(e);
     };
 
-    // Lắng nghe khi đã cài xong
+    // Khi user đã cài xong
     const handleInstalled = () => {
+      console.log("🎉 PWA INSTALLED");
       setIsInstalled(true);
       setInstallPrompt(null);
-      console.log("🎉 PWA installed!");
     };
 
     window.addEventListener("beforeinstallprompt", handlePrompt);
@@ -71,15 +60,25 @@ useEffect(() => {
 
   // ── Trigger install (Android) ────────────────────────────────
   const handleInstall = async () => {
-    if (!installPrompt) return;
+    if (!installPrompt) {
+      console.log("❌ No install prompt available");
+      return;
+    }
+
     const result = await installPrompt.prompt();
+
+    console.log("👉 User choice:", result.outcome);
+
     if (result.outcome === "accepted") {
+      console.log("✅ User accepted install");
       setInstallPrompt(null);
     }
   };
 
-  // ── Show iOS guide ───────────────────────────────────────────
-  const handleIOSInstall = () => setShowIOSGuide(true);
+  // ── iOS fallback ─────────────────────────────────────────────
+  const handleIOSInstall = () => {
+    setShowIOSGuide(true);
+  };
 
   return {
     // Install
@@ -90,7 +89,8 @@ useEffect(() => {
     setShowIOSGuide,
     handleInstall,
     handleIOSInstall,
-    // Update
+
+    // Update SW
     needRefresh,
     updateServiceWorker,
     dismissUpdate: () => setNeedRefresh(false),
