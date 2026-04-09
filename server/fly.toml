@@ -1,0 +1,43 @@
+# fly.toml — Cấu hình Fly.io cho Backend
+app = 'realtime-chat-server'
+primary_region = 'sin'
+
+# ── Build ─────────────────────────────────────────────────────────
+[build]
+  dockerfile = "Dockerfile"
+
+# ── Environment Variables (public) ────────────────────────────────
+# Secrets (private) set bằng lệnh fly secrets set
+[env]
+  NODE_ENV = "production"
+  PORT = "5000"
+  JWT_ACCESS_EXPIRES_IN = "15m"
+  JWT_REFRESH_EXPIRES_IN = "7d"
+
+# ── HTTP Service ──────────────────────────────────────────────────
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Health check (PHẢI là array)
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/v1/health"
+    protocol = "http"
+    timeout = "10s"
+
+# ── Machine Resources ─────────────────────────────────────────────
+[[vm]]
+  memory = "512mb"     # Free tier: 256MB, trả phí: 512MB+
+  cpu_kind = "shared"
+  cpus = 1
+
+# ── Mounts (optional — nếu cần persistent storage) ────────────────
+# [[mounts]]
+#   source = "data"
+#   destination = "/app/data"
