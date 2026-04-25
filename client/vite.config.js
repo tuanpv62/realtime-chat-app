@@ -1,11 +1,10 @@
-/* eslint-disable no-unused-vars */
-/* eslint-disable no-undef */
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig(({ mode }) => {
+  // eslint-disable-next-line no-unused-vars
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
@@ -13,83 +12,139 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: "autoUpdate",
-        includeAssets: ["favicon.ico", "icons/*.png", "screenshots/*.png"],
-        manifest: false, // Dùng manifest.json riêng
+        injectRegister: "auto",
+
+        // Đưa manifest vào trong plugin (không cần file riêng)
+        manifest: {
+          name: "ChatNóiBo",
+          short_name: "ChatNóiBo",
+          description: "Ứng dụng chat realtime — Kết nối mọi lúc mọi nơi",
+          start_url: "/",
+          scope: "/",
+          display: "standalone",
+          background_color: "#0f172a",
+          theme_color: "#2563eb",
+          orientation: "portrait",
+          lang: "vi",
+          icons: [
+            {
+              src: "/icons/icon-72x72.png",
+              sizes: "72x72",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/icons/icon-96x96.png",
+              sizes: "96x96",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/icons/icon-128x128.png",
+              sizes: "128x128",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/icons/icon-144x144.png",
+              sizes: "144x144",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/icons/icon-152x152.png",
+              sizes: "152x152",
+              type: "image/png",
+              purpose: "any",
+            },
+            {
+              src: "/icons/icon-192x192.png",
+              sizes: "192x192",
+              type: "image/png",
+              purpose: "any maskable",
+            },
+            {
+              src: "/icons/icon-384x384.png",
+              sizes: "384x384",
+              type: "image/png",
+              purpose: "any maskable",
+            },
+            {
+              src: "/icons/icon-512x512.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "any maskable",
+            },
+          ],
+          shortcuts: [
+            {
+              name: "Mở Chat",
+              url: "/chat",
+              icons: [{ src: "/icons/icon-96x96.png", sizes: "96x96" }],
+            },
+          ],
+        },
+
         workbox: {
-          // Cache strategies
+          // Cache app shell
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+
           runtimeCaching: [
             {
-              // Cache API calls ngắn hạn
-              urlPattern: /^https:\/\/.*\/api\/v1\/auth\/.*/i,
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "auth-cache",
-                expiration: { maxEntries: 10, maxAgeSeconds: 300 },
-              },
-            },
-            {
-              // Cache static assets lâu dài
-              urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-              handler: "CacheFirst",
-              options: {
-                cacheName: "images-cache",
-                expiration: {
-                  maxEntries: 100,
-                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 ngày
-                },
-              },
-            },
-            {
-              // Cache Cloudinary images
+              // Cache ảnh Cloudinary
               urlPattern: /^https:\/\/res\.cloudinary\.com\/.*/i,
               handler: "CacheFirst",
               options: {
-                cacheName: "cloudinary-cache",
+                cacheName: "cloudinary-images",
                 expiration: {
-                  maxEntries: 200,
-                  maxAgeSeconds: 60 * 60 * 24 * 7, // 7 ngày
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
                 },
               },
             },
             {
-              // Cache Google Fonts nếu có
-              urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-              handler: "CacheFirst",
+              // NetworkFirst cho API — luôn lấy data mới nhất
+              urlPattern: /^https:\/\/.*\/api\/v1\/.*/i,
+              handler: "NetworkFirst",
               options: {
-                cacheName: "fonts-cache",
-                expiration: { maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheName: "api-cache",
+                networkTimeoutSeconds: 10,
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 300,
+                },
               },
             },
           ],
-          // Skip waiting — Update ngay khi có service worker mới
+
           skipWaiting: true,
           clientsClaim: true,
-          // Không cache API calls (trừ những cái đã config trên)
           navigateFallback: "/index.html",
           navigateFallbackDenylist: [/^\/api/],
         },
+
         devOptions: {
-          enabled: true, // Test PWA khi development
-          type: "module",
+          enabled: false, // Tắt khi dev để tránh conflict
         },
       }),
     ],
+
     resolve: {
       alias: { "@": path.resolve(__dirname, "./src") },
     },
+
     server: {
       port: 5173,
       proxy: {
         "/api/v1": {
           target: "http://localhost:5000",
           changeOrigin: true,
-          secure: false,
         },
       },
     },
+
     build: {
       outDir: "dist",
-      sourcemap: mode === "development",
       rollupOptions: {
         output: {
           manualChunks: {
@@ -106,7 +161,6 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      chunkSizeWarningLimit: 500,
     },
   };
 });

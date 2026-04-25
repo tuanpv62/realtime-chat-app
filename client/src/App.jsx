@@ -11,6 +11,7 @@ import ProfilePage from '@/pages/profile/ProfilePage';
 import { InstallBanner } from '@/components/pwa/InstallBanner';
 import { SplashScreen } from '@/components/pwa/SplashScreen';
 import { Loader2 } from 'lucide-react';
+import { InstallButton } from '@/components/pwa/InstallButton'; // ← thêm dòng này
 
 function SocketInitializer() {
   useSocket();
@@ -82,6 +83,8 @@ export default function App() {
 
       {/* PWA Install Banner — hiện ở mọi trang */}
       <InstallBanner />
+       {/* ✅ Nút tải về — hiện ở mọi trang */}
+      <InstallButton />
     </>
   );
 }
