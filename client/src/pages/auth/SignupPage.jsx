@@ -12,6 +12,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { useAuthStore } from '@/stores/authStore';
+import { InstallBannerInline } from '@/components/pwa/InstallBannerInline';
+
+
+
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -190,6 +194,7 @@ export default function SignupPage() {
             </div>
           </CardContent>
         </Card>
+        <InstallBannerInline />
       </div>
     </div>
   );

@@ -1,49 +1,70 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 
 export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [canInstall, setCanInstall] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [canInstall, setCanInstall]         = useState(false);
+  const [isInstalled, setIsInstalled]       = useState(false);
+  // ✅ Thêm state này — hiện nút dù chưa có event
+  const [showManual, setShowManual]         = useState(false);
 
   useEffect(() => {
     // Kiểm tra đã cài chưa
     const installed =
-      window.matchMedia("(display-mode: standalone)").matches ||
+      window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
-    setIsInstalled(installed);
 
-    // Lắng nghe sự kiện có thể cài
-    const handlePrompt = (e) => {
+    if (installed) {
+      setIsInstalled(true);
+      return;
+    }
+
+    // Nếu là Android Chrome → cho phép hiện nút thủ công
+    const isAndroid  = /android/i.test(navigator.userAgent);
+    const isChrome   = /chrome/i.test(navigator.userAgent);
+    if (isAndroid && isChrome) {
+      setShowManual(true);
+    }
+
+    // Lắng nghe event tự động
+    const onPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setCanInstall(true);
+      setShowManual(false); // Ưu tiên dùng event chính thức
     };
 
-    // Lắng nghe khi cài xong
-    const handleInstalled = () => {
+    const onInstalled = () => {
       setIsInstalled(true);
       setCanInstall(false);
+      setShowManual(false);
       setDeferredPrompt(null);
     };
 
-    window.addEventListener("beforeinstallprompt", handlePrompt);
-    window.addEventListener("appinstalled", handleInstalled);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handlePrompt);
-      window.removeEventListener("appinstalled", handleInstalled);
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
     };
   }, []);
 
-  // Gọi hàm này khi user bấm nút "Tải về"
-  const install = async () => {
-    if (!deferredPrompt) return false;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-    setCanInstall(false);
-    return outcome === "accepted";
+  const triggerInstall = async () => {
+    if (deferredPrompt) {
+      // Cài qua event chính thức (Chrome tự xử lý)
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+      setCanInstall(false);
+      return outcome === 'accepted';
+    }
+    return false;
   };
 
-  return { canInstall, isInstalled, install };
+  return {
+    canInstall,
+    isInstalled,
+    showManual,   // ← dùng cái này để hiện hướng dẫn thủ công
+    triggerInstall,
+  };
 }

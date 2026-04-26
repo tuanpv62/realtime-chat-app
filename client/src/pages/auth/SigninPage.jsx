@@ -16,6 +16,11 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { useAuthStore } from '@/stores/authStore';
+// Thêm import
+import { InstallBannerInline } from '@/components/pwa/InstallBannerInline';
+
+
+
 
 export default function SigninPage() {
   const navigate = useNavigate();
@@ -169,6 +174,9 @@ export default function SigninPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* ✅ Thêm dòng này — nút tải về ngay dưới card */}
+        <InstallBannerInline />
       </div>
     </div>
   );
