@@ -1,13 +1,16 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import { sendSuccess } from "../utils/response.js";
 import {
+  searchUsersService,
   sendFriendRequestService,
   respondFriendRequestService,
   cancelFriendRequestService,
   getFriendsService,
   getPendingRequestsService,
   unfriendService,
-  searchUsersService,
+  followUserService,
+  unfollowUserService,
+  getFollowingService,
 } from "../services/friend.service.js";
 
 export const searchUsers = asyncHandler(async (req, res) => {
@@ -19,17 +22,29 @@ export const searchUsers = asyncHandler(async (req, res) => {
 export const sendFriendRequest = asyncHandler(async (req, res) => {
   const { receiverId } = req.body;
   if (!receiverId) {
-    return res
-      .status(400)
-      .json({ success: false, message: "receiverId is required" });
+    return res.status(400).json({
+      success: false,
+      message: "receiverId is required",
+    });
   }
-  const result = await sendFriendRequestService(req.user._id, receiverId);
+
+  // ✅ Truyền io vào service để emit socket
+  const io = req.app.get("io");
+  const result = await sendFriendRequestService(
+    req.user._id,
+    receiverId,
+    io, // ← Thêm dòng này
+  );
+
   return sendSuccess(res, {
     statusCode: 201,
     message: result.autoAccepted
       ? "Friend request auto-accepted"
       : "Friend request sent",
-    data: { request: result.request, autoAccepted: result.autoAccepted },
+    data: {
+      request: result.request,
+      autoAccepted: result.autoAccepted,
+    },
   });
 });
 
@@ -78,4 +93,31 @@ export const unfriend = asyncHandler(async (req, res) => {
   const { friendId } = req.params;
   await unfriendService(req.user._id, friendId);
   return sendSuccess(res, { message: "Unfriended successfully" });
+});
+
+
+// ── Follow ────────────────────────────────────────────────────────
+export const followUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const result = await followUserService(req.user._id, userId);
+  return sendSuccess(res, {
+    message: 'Đã theo dõi',
+    data: result,
+  });
+});
+
+// ── Unfollow ──────────────────────────────────────────────────────
+export const unfollowUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const result = await unfollowUserService(req.user._id, userId);
+  return sendSuccess(res, {
+    message: 'Đã hủy theo dõi',
+    data: result,
+  });
+});
+
+// ── Get Following ─────────────────────────────────────────────────
+export const getFollowing = asyncHandler(async (req, res) => {
+  const following = await getFollowingService(req.user._id);
+  return sendSuccess(res, { data: { following } });
 });

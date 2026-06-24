@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAuthStore } from '@/stores/authStore';
 // eslint-disable-next-line no-unused-vars
 import { chatAPI } from '@/api/chat.api';
-import { useChatStore } from '@/stores/chatStore';
+//import { useChatStore } from '@/stores/chatStore';
 
 // Quick reaction emojis
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
@@ -66,24 +66,22 @@ export function MessageCard({
   showAvatar = true,
   showSenderName = false,
   onReply,
-    onEdit,
-    onReact,    // 🆕
-  onDelete,   // 🆕
+  onEdit,
+  onReact,
+  onDelete,
+  onScrollToMessage,   // ✅ Thêm prop này
+  isHighlighted = false, // ✅ Hiệu ứng highlight khi được scroll tới
 }) {
   const { user: currentUser } = useAuthStore();
-  // eslint-disable-next-line no-unused-vars
-  const { updateMessage, activeConversation } = useChatStore();
   const [showActions, setShowActions] = useState(false);
-  const [isReacting, setIsReacting] = useState(false);
+  const [isReacting, setIsReacting]   = useState(false);
 
-  const isOwn =
+  const isOwn = 
     message.sender?.id === currentUser?.id ||
     message.sender?._id === currentUser?.id;
-
   const isDeleted = message.isDeleted;
-  const isSystem = message.type === 'system';
+  const isSystem  = message.type === 'system';
 
-  // ── System message ─────────────────────────────────────────────
   if (isSystem) {
     return (
       <div className="flex justify-center py-2">
@@ -94,9 +92,8 @@ export function MessageCard({
     );
   }
 
- const handleReact = async (emoji) => {
+  const handleReact = async (emoji) => {
     try {
-      // Dùng prop onReact (socket) thay vì chatAPI trực tiếp
       await onReact?.(message.id || message._id, emoji);
     } catch (err) {
       console.error('React failed:', err);
@@ -112,12 +109,28 @@ export function MessageCard({
     }
   };
 
+  // ✅ Click vào reply preview → scroll lên tin nhắn gốc
+  const handleReplyClick = () => {
+    if (message.replyTo) {
+      const replyId = message.replyTo.id || message.replyTo._id;
+      onScrollToMessage?.(replyId);
+    }
+  };
+
   return (
     <div
-      className={cn(
-        'flex items-end gap-2 px-4 py-0.5 group',
-        isOwn ? 'flex-row-reverse' : 'flex-row'
-      )}
+      // className={cn(
+      //   'flex items-end gap-2 px-4 py-0.5 group transition-colors duration-200',
+      //   isOwn ? 'flex-row-reverse' : 'flex-row',
+      //   // ✅ Highlight animation khi được scroll tới
+      //   isHighlighted && 'bg-primary/10 rounded-xl',
+      // )}
+      // Thay className isHighlighted:
+className={cn(
+  'flex items-end gap-2 px-4 py-0.5 group',
+  isOwn ? 'flex-row-reverse' : 'flex-row',
+  isHighlighted && 'message-highlight',
+)}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
@@ -129,49 +142,53 @@ export function MessageCard({
       </div>
 
       {/* Message content */}
-      <div className={cn('max-w-[70%] flex flex-col', isOwn ? 'items-end' : 'items-start')}>
-        {/* Sender name (group chat) */}
+      <div className={cn(
+        'max-w-[70%] flex flex-col',
+        isOwn ? 'items-end' : 'items-start'
+      )}>
+        {/* Sender name */}
         {showSenderName && !isOwn && (
           <span className="text-xs font-medium text-muted-foreground ml-1 mb-0.5">
             {message.sender?.displayName || message.sender?.username}
           </span>
         )}
 
-        {/* Reply preview */}
+        {/* ✅ Reply preview — có thể click */}
         {message.replyTo && !isDeleted && (
-          <div
+          <button
+            onClick={handleReplyClick}
             className={cn(
-              'text-xs px-3 py-1.5 rounded-lg mb-1 border-l-2 border-primary bg-muted max-w-full',
-              'truncate'
+              'text-xs px-3 py-1.5 rounded-lg mb-1 max-w-full text-left',
+              'border-l-2 border-primary bg-muted',
+              'hover:bg-muted/70 active:scale-95 transition-all duration-150',
+              'cursor-pointer',
             )}
           >
-            <span className="font-medium text-primary">
+            <span className="font-medium text-primary block">
               {message.replyTo.sender?.displayName || message.replyTo.sender?.username}
             </span>
             <p className="truncate text-muted-foreground">
-              {message.replyTo.content || 'Tin nhắn đã bị xóa'}
+              {message.replyTo.isDeleted
+                ? 'Tin nhắn đã bị xóa'
+                : message.replyTo.content || 'Tin nhắn'}
             </p>
-          </div>
+          </button>
         )}
 
         {/* Bubble */}
-        <div
-          className={cn(
-            'relative px-3 py-2 rounded-2xl text-sm leading-relaxed',
-            isOwn
-              ? 'bg-primary text-primary-foreground rounded-br-sm'
-              : 'bg-muted rounded-bl-sm',
-            isDeleted && 'opacity-60 italic',
-          )}
-        >
-          {/* Text content */}
+        <div className={cn(
+          'relative px-3 py-2 rounded-2xl text-sm leading-relaxed',
+          isOwn
+            ? 'bg-primary text-primary-foreground rounded-br-sm'
+            : 'bg-muted rounded-bl-sm',
+          isDeleted && 'opacity-60 italic',
+        )}>
           {(message.type === 'text' || isDeleted) && (
             <p className="whitespace-pre-wrap break-words">
               {isDeleted ? '🗑 Tin nhắn đã bị thu hồi' : message.content}
             </p>
           )}
 
-          {/* Image */}
           {message.type === 'image' && !isDeleted && message.attachments?.[0] && (
             <img
               src={message.attachments[0].url}
@@ -181,22 +198,35 @@ export function MessageCard({
             />
           )}
 
-          {/* Edited badge */}
           {message.isEdited && !isDeleted && (
             <span className="text-[10px] opacity-60 ml-1">(đã chỉnh sửa)</span>
           )}
         </div>
 
         {/* Reactions */}
-        <ReactionDisplay reactions={message.reactions} />
+        {message.reactions && Object.keys(message.reactions).length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {Object.entries(message.reactions)
+              .filter(([, users]) => users.length > 0)
+              .map(([emoji, users]) => (
+                <span
+                  key={emoji}
+                  className="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs border"
+                >
+                  {emoji}
+                  {users.length > 1 && (
+                    <span className="text-[10px] text-muted-foreground">{users.length}</span>
+                  )}
+                </span>
+              ))}
+          </div>
+        )}
 
         {/* Time + Status */}
-        <div
-          className={cn(
-            'flex items-center gap-1 mt-0.5 px-1',
-            isOwn ? 'flex-row-reverse' : 'flex-row'
-          )}
-        >
+        <div className={cn(
+          'flex items-center gap-1 mt-0.5 px-1',
+          isOwn ? 'flex-row-reverse' : 'flex-row'
+        )}>
           <span className="text-[10px] text-muted-foreground">
             {format(new Date(message.createdAt), 'HH:mm')}
           </span>
@@ -206,15 +236,13 @@ export function MessageCard({
         </div>
       </div>
 
-      {/* Action Buttons (hover) */}
+      {/* Action Buttons */}
       {!isDeleted && (
-        <div
-          className={cn(
-            'flex items-center gap-0.5 opacity-0 transition-opacity',
-            showActions && 'opacity-100',
-            isOwn ? 'flex-row-reverse' : 'flex-row'
-          )}
-        >
+        <div className={cn(
+          'flex items-center gap-0.5 opacity-0 transition-opacity',
+          showActions && 'opacity-100',
+          isOwn ? 'flex-row-reverse' : 'flex-row',
+        )}>
           {/* Quick React */}
           <Popover open={isReacting} onOpenChange={setIsReacting}>
             <PopoverTrigger asChild>
@@ -224,7 +252,7 @@ export function MessageCard({
             </PopoverTrigger>
             <PopoverContent className="w-auto p-2" side="top">
               <div className="flex gap-1">
-                {QUICK_EMOJIS.map((emoji) => (
+                {['👍','❤️','😂','😮','😢','🔥'].map((emoji) => (
                   <button
                     key={emoji}
                     onClick={() => handleReact(emoji)}
@@ -247,7 +275,7 @@ export function MessageCard({
             <Reply className="h-3.5 w-3.5" />
           </Button>
 
-          {/* More options (own messages only) */}
+          {/* More options */}
           {isOwn && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -97,6 +97,13 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Thêm vào userSchema, sau field isEmailVerified:
+    following: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   {
     // timestamps: true → Tự động thêm createdAt và updatedAt

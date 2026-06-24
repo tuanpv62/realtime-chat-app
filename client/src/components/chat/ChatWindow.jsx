@@ -66,9 +66,7 @@ function EditInput({ message, onSave, onCancel }) {
 }
 
 export function ChatWindow({ onBack }) {
-  // ✅ Khai báo isMobile từ useBreakpoint ngay trong component
   const { isMobile } = useBreakpoint();
-
   const { user: currentUser } = useAuthStore();
   const {
     activeConversation,
@@ -76,34 +74,36 @@ export function ChatWindow({ onBack }) {
     setMessages,
     appendMessages,
     addMessage,
- 
     updateMessage,
     isUserOnline,
     hasMoreMessages,
   } = useChatStore();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [replyTo, setReplyTo] = useState(null);
+  const [isLoading,      setIsLoading]      = useState(false);
+  const [isLoadingMore,  setIsLoadingMore]  = useState(false);
+  const [replyTo,        setReplyTo]        = useState(null);
   const [editingMessage, setEditingMessage] = useState(null);
-  const [page, setPage] = useState(1);
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [page,           setPage]           = useState(1);
+  const [showScrollBtn,  setShowScrollBtn]  = useState(false);
+
+  // ✅ State highlight tin nhắn được scroll tới
+  const [highlightedId,  setHighlightedId]  = useState(null);
+
   const virtuosoRef = useRef(null);
 
   const conversationId = activeConversation?.id || activeConversation?._id;
-  const messages = getMessages(conversationId);
+  const messages       = getMessages(conversationId);
   const groupedMessages = groupMessages(messages);
 
   const { handleTyping, typingUsers } = useConversationSocket(conversationId);
   const { sendMessage, editMessage, deleteMessage, reactToMessage } =
     useRealtimeMessages(conversationId);
 
-  // Load messages khi đổi conversation
+  // Load messages
   useEffect(() => {
     if (!conversationId) return;
     setIsLoading(true);
     setPage(1);
-
     chatAPI
       .getMessages(conversationId, { page: 1, limit: 30 })
       .then(({ messages: msgs, pagination }) => {
@@ -131,15 +131,14 @@ export function ChatWindow({ onBack }) {
     }
   }, [messages.length]);
 
-  // Load more — infinite scroll
+  // Load more
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMoreMessages[conversationId]) return;
     setIsLoadingMore(true);
     const nextPage = page + 1;
     try {
       const { messages: older, pagination } = await chatAPI.getMessages(
-        conversationId,
-        { page: nextPage, limit: 30 }
+        conversationId, { page: nextPage, limit: 30 }
       );
       appendMessages(conversationId, older);
       setPage(nextPage);
@@ -156,6 +155,72 @@ export function ChatWindow({ onBack }) {
     }
   }, [conversationId, isLoadingMore, page, hasMoreMessages]);
 
+  // ✅ Scroll tới tin nhắn theo ID — giống Messenger
+  const handleScrollToMessage = useCallback(async (targetMessageId) => {
+    // Tìm index trong danh sách hiện tại
+    let targetIndex = messages.findIndex(
+      (m) => (m.id || m._id) === targetMessageId ||
+              m.id?.toString() === targetMessageId?.toString() ||
+              m._id?.toString() === targetMessageId?.toString()
+    );
+
+    // Nếu chưa load (tin nhắn cũ hơn) → load thêm
+    if (targetIndex === -1 && hasMoreMessages[conversationId]) {
+      // Load tất cả cho đến khi tìm thấy (tối đa 5 trang)
+      let currentPage = page;
+      let found = false;
+
+      for (let i = 0; i < 5 && !found; i++) {
+        currentPage += 1;
+        try {
+          const { messages: older, pagination } = await chatAPI.getMessages(
+            conversationId, { page: currentPage, limit: 30 }
+          );
+          appendMessages(conversationId, older);
+          setPage(currentPage);
+
+          if (!pagination.hasMore) {
+            useChatStore.setState((s) => ({
+              hasMoreMessages: {
+                ...s.hasMoreMessages,
+                [conversationId]: false,
+              },
+            }));
+          }
+
+          // Kiểm tra lại sau khi load
+          const updatedMessages = useChatStore.getState().getMessages(conversationId);
+          const newIndex = updatedMessages.findIndex(
+            (m) => (m.id || m._id)?.toString() === targetMessageId?.toString()
+          );
+
+          if (newIndex !== -1) {
+            targetIndex = newIndex;
+            found = true;
+          }
+
+          if (!pagination.hasMore) break;
+        } catch (err) {
+          console.error(err);
+          break;
+        }
+      }
+    }
+
+    if (targetIndex === -1) return; // Không tìm thấy
+
+    // ✅ Scroll tới index
+    virtuosoRef.current?.scrollToIndex({
+      index: targetIndex,
+      behavior: 'smooth',
+      align: 'center', // Căn giữa màn hình
+    });
+
+    // ✅ Highlight tin nhắn trong 1.5 giây
+    setHighlightedId(targetMessageId);
+    setTimeout(() => setHighlightedId(null), 1500);
+  }, [messages, conversationId, hasMoreMessages, page]);
+
   const handleSend = async ({ content, type = 'text', replyTo: replyId }) => {
     await sendMessage({ content, type, replyTo: replyId });
     setReplyTo(null);
@@ -171,8 +236,7 @@ export function ChatWindow({ onBack }) {
     setEditingMessage(null);
   };
 
-  // Display info
-  const isGroup = activeConversation?.type === 'group';
+  const isGroup   = activeConversation?.type === 'group';
   const otherUser = isGroup
     ? null
     : activeConversation?.participants?.find(
@@ -181,15 +245,9 @@ export function ChatWindow({ onBack }) {
   const displayName = isGroup
     ? activeConversation?.name
     : otherUser?.displayName || otherUser?.username;
-  const isOnline = otherUser
-    ? isUserOnline(otherUser.id || otherUser._id)
-    : false;
+  const isOnline = otherUser ? isUserOnline(otherUser.id || otherUser._id) : false;
+  const typingArray = [...typingUsers].filter((id) => id !== currentUser?.id);
 
-  const typingArray = [...typingUsers].filter(
-    (id) => id !== currentUser?.id
-  );
-
-  // Empty state
   if (!activeConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background">
@@ -209,14 +267,12 @@ export function ChatWindow({ onBack }) {
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
 
-      {/* ── Header ─────────────────────────────────────────────── */}
+      {/* Header */}
       {isLoading ? (
         <ChatHeaderSkeleton />
       ) : (
         <div className="flex items-center justify-between px-3 py-2.5 border-b bg-card shrink-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-
-            {/* ✅ isMobile giờ đã được khai báo ở trên */}
             {isMobile && onBack && (
               <Button
                 variant="ghost"
@@ -227,21 +283,16 @@ export function ChatWindow({ onBack }) {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             )}
-
             <UserAvatar
               user={
                 isGroup
-                  ? {
-                      displayName: activeConversation.name,
-                      avatar: activeConversation.groupAvatar,
-                    }
+                  ? { displayName: activeConversation.name, avatar: activeConversation.groupAvatar }
                   : otherUser
               }
               size="sm"
               showStatus={!isGroup}
               className="shrink-0"
             />
-
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-sm truncate">{displayName}</p>
               {isGroup ? (
@@ -249,16 +300,10 @@ export function ChatWindow({ onBack }) {
                   {activeConversation.participants?.length} thành viên
                 </p>
               ) : (
-                <StatusBadge
-                  isOnline={isOnline}
-                  lastSeen={otherUser?.lastSeen}
-                  showLabel
-                />
+                <StatusBadge isOnline={isOnline} lastSeen={otherUser?.lastSeen} showLabel />
               )}
             </div>
           </div>
-
-          {/* Actions */}
           <div className="flex items-center gap-0.5 shrink-0">
             {!isMobile && (
               <>
@@ -277,7 +322,7 @@ export function ChatWindow({ onBack }) {
         </div>
       )}
 
-      {/* ── Messages ─────────────────────────────────────────────── */}
+      {/* Messages */}
       <div className="flex-1 relative overflow-hidden">
         {isLoading ? (
           <MessageListSkeleton />
@@ -287,9 +332,7 @@ export function ChatWindow({ onBack }) {
             data={groupedMessages}
             followOutput="smooth"
             initialTopMostItemIndex={Math.max(0, groupedMessages.length - 1)}
-            startReached={
-              hasMoreMessages[conversationId] ? loadMore : undefined
-            }
+            startReached={hasMoreMessages[conversationId] ? loadMore : undefined}
             atBottomStateChange={(atBottom) => setShowScrollBtn(!atBottom)}
             style={{ height: '100%' }}
             components={{
@@ -300,34 +343,41 @@ export function ChatWindow({ onBack }) {
                   </div>
                 ) : null,
             }}
-            itemContent={(_, message) => (
-              <div key={message.id || message._id} className="py-0.5">
-                {/* // ✅ Fix — Phải check editingMessage tồn tại TRƯỚC */}
-{editingMessage && (
-  (editingMessage.id && editingMessage.id === message.id) ||
-  (editingMessage._id && editingMessage._id === message._id) ||
-  // Fallback: so sánh toString() để handle cả ObjectId
-  editingMessage._id?.toString() === message._id?.toString() ||
-  editingMessage.id?.toString() === message.id?.toString()
-) ? (
-  <EditInput
-    message={message}
-    onSave={handleEditSave}
-    onCancel={() => setEditingMessage(null)}
-  />
-) : (
-  <MessageCard
-    message={message}
-    showAvatar={message.showAvatar}
-    showSenderName={isGroup && message.showSenderName}
-    onReply={setReplyTo}
-    onEdit={setEditingMessage}
-    onReact={reactToMessage}
-    onDelete={deleteMessage}
-  />
-)}
-              </div>
-            )}
+            itemContent={(_, message) => {
+              const msgId = message.id || message._id;
+
+              return (
+                <div key={msgId} className="py-0.5">
+                  {/* ✅ Check edit đúng cách */}
+                  {editingMessage && (
+                    editingMessage._id?.toString() === message._id?.toString() ||
+                    editingMessage.id?.toString() === message.id?.toString()
+                  ) ? (
+                    <EditInput
+                      message={message}
+                      onSave={handleEditSave}
+                      onCancel={() => setEditingMessage(null)}
+                    />
+                  ) : (
+                    <MessageCard
+                      message={message}
+                      showAvatar={message.showAvatar}
+                      showSenderName={isGroup && message.showSenderName}
+                      onReply={setReplyTo}
+                      onEdit={setEditingMessage}
+                      onReact={reactToMessage}
+                      onDelete={deleteMessage}
+                      // ✅ Truyền xuống MessageCard
+                      onScrollToMessage={handleScrollToMessage}
+                      isHighlighted={
+                        highlightedId &&
+                        (highlightedId?.toString() === msgId?.toString())
+                      }
+                    />
+                  )}
+                </div>
+              );
+            }}
           />
         )}
 
@@ -348,7 +398,7 @@ export function ChatWindow({ onBack }) {
         )}
       </div>
 
-      {/* ── Typing Indicator ─────────────────────────────────────── */}
+      {/* Typing */}
       {typingArray.length > 0 && (
         <div className="px-4 py-1 shrink-0">
           <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -366,7 +416,7 @@ export function ChatWindow({ onBack }) {
         </div>
       )}
 
-      {/* ── Input ────────────────────────────────────────────────── */}
+      {/* Input */}
       <MessageInput
         onSend={handleSend}
         onTyping={handleTyping}

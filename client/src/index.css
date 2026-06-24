@@ -129,6 +129,21 @@
   }
 }
 
+
+/* Thêm vào cuối file */
+
+/* Highlight effect khi scroll tới tin nhắn — giống Messenger */
+@keyframes message-highlight {
+  0%   { background-color: hsl(var(--primary) / 0.15); }
+  60%  { background-color: hsl(var(--primary) / 0.15); }
+  100% { background-color: transparent; }
+}
+
+.message-highlight {
+  animation: message-highlight 1.5s ease-out forwards;
+  border-radius: 0.75rem;
+}
+
 /* Tắt highlight xanh khi tap */
 * {
   -webkit-tap-highlight-color: transparent;

@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react';
 import { Check, X, Clock, Loader2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +8,7 @@ import { UserAvatar } from '@/components/shared/UserAvatar';
 import { friendAPI } from '@/api/chat.api';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { useNotificationStore } from '../../stores/notificationStore';
 
 export function FriendRequestsPanel() {
   const [received, setReceived] = useState([]);
@@ -13,25 +16,30 @@ export function FriendRequestsPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
 
-  useEffect(() => {
+  const { setPendingCount, decrementPending } = useNotificationStore();
+
+
+ useEffect(() => {
     setIsLoading(true);
     friendAPI
       .getPendingRequests()
       .then(({ received: r, sent: s }) => {
         setReceived(r);
         setSent(s);
+        // ✅ Sync đúng số thực tế từ server
+        setPendingCount(r.length);
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
   }, []);
 
-  const handleAccept = async (request) => {
-    setProcessingId(request._id || request.id);
+ const handleAccept = async (request) => {
+    const reqId = request._id || request.id;
+    setProcessingId(reqId);
     try {
-      await friendAPI.respondRequest(request._id || request.id, 'accept');
-      setReceived((prev) =>
-        prev.filter((r) => (r._id || r.id) !== (request._id || request.id))
-      );
+      await friendAPI.respondRequest(reqId, 'accept');
+      setReceived((prev) => prev.filter((r) => (r._id || r.id) !== reqId));
+      decrementPending(); // ✅ Giảm badge
     } catch (err) {
       console.error(err);
     } finally {
@@ -40,12 +48,12 @@ export function FriendRequestsPanel() {
   };
 
   const handleReject = async (request) => {
-    setProcessingId(request._id || request.id);
+    const reqId = request._id || request.id;
+    setProcessingId(reqId);
     try {
-      await friendAPI.respondRequest(request._id || request.id, 'reject');
-      setReceived((prev) =>
-        prev.filter((r) => (r._id || r.id) !== (request._id || request.id))
-      );
+      await friendAPI.respondRequest(reqId, 'reject');
+      setReceived((prev) => prev.filter((r) => (r._id || r.id) !== reqId));
+      decrementPending(); // ✅ Giảm badge
     } catch (err) {
       console.error(err);
     } finally {
@@ -54,12 +62,11 @@ export function FriendRequestsPanel() {
   };
 
   const handleCancel = async (request) => {
-    setProcessingId(request._id || request.id);
+    const reqId = request._id || request.id;
+    setProcessingId(reqId);
     try {
-      await friendAPI.cancelRequest(request._id || request.id);
-      setSent((prev) =>
-        prev.filter((r) => (r._id || r.id) !== (request._id || request.id))
-      );
+      await friendAPI.cancelRequest(reqId);
+      setSent((prev) => prev.filter((r) => (r._id || r.id) !== reqId));
     } catch (err) {
       console.error(err);
     } finally {

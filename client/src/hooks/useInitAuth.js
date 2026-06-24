@@ -1,15 +1,24 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
+import { useNotificationStore } from "@/stores/notificationStore"; // ✅
 
 export function useInitAuth() {
-  const initializeAuth = useAuthStore((s) => s.initializeAuth);
-  const isInitialized = useAuthStore((s) => s.isInitialized);
+  const { initializeAuth, isInitialized, user } = useAuthStore();
+  const { fetchPendingCount } = useNotificationStore(); // ✅
 
   useEffect(() => {
     if (!isInitialized) {
       initializeAuth();
     }
-  }, [isInitialized, initializeAuth]);
+  }, []);
+
+  // ✅ Fetch pending requests khi user đã đăng nhập
+  useEffect(() => {
+    if (user) {
+      fetchPendingCount();
+    }
+  }, [user?.id]);
 
   return isInitialized;
 }

@@ -8,10 +8,12 @@ import {
   getFriends,
   getPendingRequests,
   unfriend,
+  followUser,
+  unfollowUser,
+  getFollowing,
 } from "../controllers/friend.controller.js";
 
 const router = Router();
-
 // Tất cả routes đều cần đăng nhập
 router.use(protect);
 
@@ -123,5 +125,13 @@ router.delete("/requests/:requestId", cancelFriendRequest);
  *       - bearerAuth: []
  */
 router.delete("/:friendId", unfriend);
+
+
+router.get("/following", getFollowing);
+
+// ✅ Follow routes
+router.post('/:userId/follow',    followUser);
+router.delete('/:userId/follow', unfollowUser);
+
 
 export default router;

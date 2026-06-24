@@ -3,53 +3,103 @@ import User from "../models/user.model.js";
 import AppError from "../utils/AppError.js";
 
 // ── Send Friend Request ───────────────────────────────────────────
-export const sendFriendRequestService = async (senderId, receiverId) => {
-  // Không thể gửi lời mời cho chính mình
+export const sendFriendRequestService = async (senderId, receiverId, io) => {
   if (senderId.toString() === receiverId.toString()) {
     throw new AppError("Cannot send friend request to yourself", 400);
   }
 
-  // Kiểm tra receiver tồn tại
   const receiver = await User.findById(receiverId);
   if (!receiver) throw new AppError("User not found", 404);
 
-  // Kiểm tra đã là bạn chưa
   const alreadyFriends = await FriendRequest.areFriends(senderId, receiverId);
   if (alreadyFriends) throw new AppError("You are already friends", 409);
 
-  // Kiểm tra đã gửi request chưa (pending)
-  const existingRequest = await FriendRequest.findOne({
+  // Check pending (chiều thuận)
+  const pendingRequest = await FriendRequest.findOne({
     sender: senderId,
     receiver: receiverId,
     status: "pending",
   });
-  if (existingRequest) throw new AppError("Friend request already sent", 409);
+  if (pendingRequest) throw new AppError("Friend request already sent", 409);
 
-  // Kiểm tra người kia đã gửi request cho mình chưa
+  // Check reverse pending
   const reverseRequest = await FriendRequest.findOne({
     sender: receiverId,
     receiver: senderId,
     status: "pending",
   });
   if (reverseRequest) {
-    // Tự động accept thay vì tạo request mới
     reverseRequest.status = "accepted";
     await reverseRequest.save();
+    await reverseRequest.populate([
+      { path: "sender", select: "username displayName avatar" },
+      { path: "receiver", select: "username displayName avatar" },
+    ]);
     return { request: reverseRequest, autoAccepted: true };
   }
 
-  const request = await FriendRequest.create({
-    sender: senderId,
-    receiver: receiverId,
+  // ✅ Tìm bất kỳ request nào giữa 2 người (cả 2 chiều)
+  // để tránh duplicate key
+  let request = await FriendRequest.findOne({
+    $or: [
+      { sender: senderId, receiver: receiverId },
+      { sender: receiverId, receiver: senderId },
+    ],
+    status: { $in: ["rejected", "cancelled"] },
   });
+
+  if (request) {
+    // Có request cũ → Reset lại
+    request.sender = senderId;
+    request.receiver = receiverId;
+    request.status = "pending";
+    request.message = "";
+    await request.save();
+  } else {
+    // Tạo mới
+    request = await FriendRequest.create({
+      sender: senderId,
+      receiver: receiverId,
+    });
+  }
 
   await request.populate([
     { path: "sender", select: "username displayName avatar" },
     { path: "receiver", select: "username displayName avatar" },
   ]);
 
+  // Emit socket
+  if (io) {
+    const { emitToUser } = await import("../socket/socket.js");
+    emitToUser(io, receiverId.toString(), "friend:request_received", {
+      request: request.toJSON(),
+      senderId: senderId.toString(),
+    });
+  }
+
   return { request, autoAccepted: false };
 };
+
+// ── Unfriend ──────────────────────────────────────────────────────
+export const unfriendService = async (userId, friendId) => {
+  // ✅ FIX: Đổi status thành 'cancelled' thay vì xóa hẳn document
+  // Giữ lại document để không bị lỗi unique index khi kết bạn lại
+  const request = await FriendRequest.findOneAndUpdate(
+    {
+      $or: [
+        { sender: userId,   receiver: friendId, status: 'accepted' },
+        { sender: friendId, receiver: userId,   status: 'accepted' },
+      ],
+    },
+    { status: 'cancelled' },
+    { new: true }
+  );
+
+  if (!request) throw new AppError('You are not friends with this user', 404);
+
+  return request;
+};
+
 
 // ── Respond to Friend Request ─────────────────────────────────────
 export const respondFriendRequestService = async (
@@ -141,17 +191,17 @@ export const getPendingRequestsService = async (userId) => {
 };
 
 // ── Unfriend ──────────────────────────────────────────────────────
-export const unfriendService = async (userId, friendId) => {
-  const request = await FriendRequest.findOneAndDelete({
-    $or: [
-      { sender: userId, receiver: friendId, status: "accepted" },
-      { sender: friendId, receiver: userId, status: "accepted" },
-    ],
-  });
+// export const unfriendService = async (userId, friendId) => {
+//   const request = await FriendRequest.findOneAndDelete({
+//     $or: [
+//       { sender: userId, receiver: friendId, status: "accepted" },
+//       { sender: friendId, receiver: userId, status: "accepted" },
+//     ],
+//   });
 
-  if (!request) throw new AppError("You are not friends with this user", 404);
-  return request;
-};
+//   if (!request) throw new AppError("You are not friends with this user", 404);
+//   return request;
+// };
 
 // ── Search Users ──────────────────────────────────────────────────
 export const searchUsersService = async (query, currentUserId) => {
@@ -203,4 +253,59 @@ export const searchUsersService = async (query, currentUserId) => {
   );
 
   return usersWithStatus;
+};
+
+// Thêm vào cuối file
+
+// ── Follow User ───────────────────────────────────────────────────
+export const followUserService = async (currentUserId, targetUserId) => {
+  if (currentUserId.toString() === targetUserId.toString()) {
+    throw new AppError('Cannot follow yourself', 400);
+  }
+
+  const targetUser = await User.findById(targetUserId);
+  if (!targetUser) throw new AppError('User not found', 404);
+
+  const currentUser = await User.findById(currentUserId);
+
+  // Kiểm tra đã follow chưa
+  const isFollowing = currentUser.following.some(
+    (id) => id.toString() === targetUserId.toString()
+  );
+
+  if (isFollowing) {
+    throw new AppError('Already following this user', 409);
+  }
+
+  await User.findByIdAndUpdate(currentUserId, {
+    $addToSet: { following: targetUserId },
+  });
+
+  return { isFollowing: true };
+};
+
+// ── Unfollow User ─────────────────────────────────────────────────
+export const unfollowUserService = async (currentUserId, targetUserId) => {
+  await User.findByIdAndUpdate(currentUserId, {
+    $pull: { following: targetUserId },
+  });
+
+  return { isFollowing: false };
+};
+
+// ── Get Follow Status ─────────────────────────────────────────────
+export const getFollowStatusService = async (currentUserId, targetUserId) => {
+  const currentUser = await User.findById(currentUserId).select('following');
+  const isFollowing = currentUser.following.some(
+    (id) => id.toString() === targetUserId.toString()
+  );
+  return { isFollowing };
+};
+
+// ── Get Following List ────────────────────────────────────────────
+export const getFollowingService = async (userId) => {
+  const user = await User.findById(userId)
+    .select('following')
+    .populate('following', 'username displayName avatar isOnline lastSeen');
+  return user?.following || [];
 };

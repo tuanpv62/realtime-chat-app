@@ -82,4 +82,21 @@ export const friendAPI = {
   unfriend: async (friendId) => {
     await api.delete(`/friends/${friendId}`);
   },
+  
+  getFollowing: async () => {
+    const res = await api.get("/friends/following");
+    return res.data.data.following;
+  },
+
+  // ✅ Follow
+  follow: async (userId) => {
+    const res = await api.post(`/friends/${userId}/follow`);
+    return res.data.data;
+  },
+
+  // ✅ Unfollow
+  unfollow: async (userId) => {
+    const res = await api.delete(`/friends/${userId}/follow`);
+    return res.data.data;
+  },
 };
